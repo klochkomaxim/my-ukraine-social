@@ -31,11 +31,14 @@
         <p style="color: #666;">Завантаження стрічки...</p>
     </div>
 
-    <div id="player">
-        <span>🎵 UA Lounge</span>
-        <button onclick="toggleMusic()" style="width: auto; padding: 5px 15px;">⏯ Грати/Пауза</button>
-        <audio id="audio-element" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop></audio>
+   <div id="player" style="flex-direction: column; height: auto;">
+    <div id="yt-video" style="display:none;"></div> <div style="display: flex; align-items: center; justify-content: space-around; width: 100%;">
+        <span id="track-name">🎵 Українська музика 2024</span>
+        <button onclick="controlYT('play')" style="width: auto; padding: 5px 10px;">▶</button>
+        <button onclick="controlYT('pause')" style="width: auto; padding: 5px 10px;">⏸</button>
+        <button onclick="controlYT('next')" style="width: auto; padding: 5px 10px;">⏭</button>
     </div>
+</div>
 
 <script>
     const tg = window.Telegram.WebApp;
@@ -113,5 +116,37 @@
 
     loadFeed();
 </script>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    let ytPlayer;
+
+    function onYouTubeIframeAPIReady() {
+        ytPlayer = new YT.Player('yt-video', {
+            height: '0',
+            width: '0',
+            playerVars: {
+                'listType': 'playlist',
+                'list': 'PL7M38X9S0l_Xf1P0rMshP_e_G3L6vG_m9', // ID плейлиста з українськими хітами
+                'autoplay': 0,
+                'loop': 1
+            },
+            events: {
+                'onReady': onPlayerReady
+            }
+        });
+    }
+
+    function onPlayerReady(event) {
+        // Плеєр готовий
+    }
+
+    function controlYT(action) {
+        if (!ytPlayer) return;
+        if (action === 'play') ytPlayer.playVideo();
+        if (action === 'pause') ytPlayer.pauseVideo();
+        if (action === 'next') ytPlayer.nextVideo();
+    }
+</script>
 </body>
 </html>
+
