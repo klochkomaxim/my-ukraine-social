@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UA Social</title>
+    <title>UA Social AI</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 20px; padding-bottom: 100px; }
+        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 20px; padding-bottom: 110px; text-align: center; }
         .card { background: #111; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #333; }
-        textarea { width: 100%; box-sizing: border-box; background: #222; color: white; border: none; padding: 12px; border-radius: 10px; margin-bottom: 10px; }
-        button { background: #0088cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        textarea { width: 100%; box-sizing: border-box; background: #222; color: white; border: none; padding: 12px; border-radius: 10px; margin-bottom: 10px; min-height: 80px; font-size: 16px; }
+        button { background: #0088cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 14px; }
         .post { background: #111; padding: 15px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
         #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 15px; border-top: 1px solid #0088cc; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; z-index: 1000; }
         #yt-api-player { display: none; }
@@ -20,17 +20,19 @@
     <h2>Привіт, <span id="user-name">Максим</span>! 🇺🇦</h2>
 
     <div class="card">
-        <textarea id="post-text" placeholder="Напиши щось цікаве..."></textarea>
-        <button onclick="publishPost()" id="pub-btn">Опублікувати 🚀</button>
+        <textarea id="post-text" placeholder="Що цікавого сьогодні?"></textarea>
+        <button onclick="askAI()" style="background: #6a1b9a;">Допомога AI ✨</button>
+        <button onclick="document.getElementById('file-input').click()" style="background: #0288d1;">Додати фото/відео 📁</button>
+        <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
+        <button onclick="publishPost()" style="background: #2e7d32;">Опублікувати 🚀</button>
     </div>
 
     <div id="feed">Завантаження стрічки...</div>
 
     <div id="yt-api-player"></div>
-
     <div id="player-ui">
-        <span style="font-size: 14px;">🎵 UA Топ 2026</span>
-        <button onclick="toggleMusic()" id="play-btn" style="width: auto; margin: 0; padding: 8px 20px;">Грати ▶</button>
+        <span style="font-size: 14px;">🎵 UA Топ плейлист</span>
+        <button onclick="toggleMusic()" id="play-btn" style="width: auto; margin: 0; padding: 8px 20px; background: #222; border: 1px solid #0088cc;">Грати ▶</button>
     </div>
 
 <script>
@@ -38,52 +40,77 @@
     tg.expand();
     document.getElementById('user-name').innerText = tg.initDataUnsafe.user?.first_name || "Максим";
 
-    // ТВОЇ ДАНІ SUPABASE (ЗІ СКРИНШОТІВ)
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co"; 
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI"; 
+    const GEMINI_KEY = "AIzaSyCnqveCi2gQzVAJCaORQYdA4P68adIArIg";
+    const BOT_TOKEN = "7951253178:AAGgUkn-6iXwGUSMe8aF3eWl916RP2dhg";
 
-    // Налаштування YouTube
     let player;
-    function onYouTubeIframeAPIReady() {
-        player = new YT.Player('yt-api-player', {
-            height: '0', width: '0',
-            playerVars: { 'listType': 'playlist', 'list': 'PL7M38X9S0l_Xf1P0rMshP_e_G3L6vG_m9' }, // Український плейлист
-        });
-    }
+    let currentFileId = null;
 
-    function toggleMusic() {
-        const btn = document.getElementById('play-btn');
-        if (player.getPlayerState() === 1) {
-            player.pauseVideo();
-            btn.innerText = "Грати ▶";
-        } else {
-            player.playVideo();
-            btn.innerText = "Пауза ⏸";
-        }
-    }
-
-    // Завантаження коду YouTube API
+    // YouTube API
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
 
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('yt-api-player', {
+            height: '0', width: '0',
+            playerVars: { 'listType': 'playlist', 'list': 'PL7M38X9S0l_Xf1P0rMshP_e_G3L6vG_m9' }
+        });
+    }
+
+    function toggleMusic() {
+        if (!player) return;
+        const state = player.getPlayerState();
+        if (state === 1) { player.pauseVideo(); document.getElementById('play-btn').innerText = "Грати ▶"; }
+        else { player.playVideo(); document.getElementById('play-btn').innerText = "Пауза ⏸"; }
+    }
+
+    // AI Функція
+    async function askAI() {
+        const text = document.getElementById('post-text').value;
+        if (!text) return alert("Напиши хоч слово!");
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_KEY}`, {
+            method: 'POST',
+            body: JSON.stringify({ contents: [{ parts: [{ text: "Зроби цей пост кращим для української соцмережі: " + text }] }] })
+        });
+        const data = await res.json();
+        document.getElementById('post-text').value = data.candidates[0].content.parts[0].text;
+    }
+
+    // Завантаження файлів
+    async function handleFileUpload(input) {
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('chat_id', tg.initDataUnsafe.user.id);
+        formData.append('document', file);
+        alert("Завантаження медіа...");
+        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
+        const data = await res.json();
+        if(data.ok) { currentFileId = data.result.document.file_id; alert("Файл додано!"); }
+    }
+
     // Публікація
     async function publishPost() {
-        const text = document.getElementById('post-text').value;
-        if(!text) return;
+        const content = document.getElementById('post-text').value;
+        if (!content && !currentFileId) return;
         
         const res = await fetch(`${SB_URL}/rest/v1/posts`, {
             method: 'POST',
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 username: tg.initDataUnsafe.user?.first_name || "Максим",
-                content: text
+                content: content,
+                media_url: currentFileId
             })
         });
-        if(res.ok) {
+        
+        if (res.ok) {
             document.getElementById('post-text').value = "";
+            currentFileId = null;
             loadFeed();
-        }
+        } else { alert("Помилка публікації. Перевір SQL у Supabase!"); }
     }
 
     // Стрічка
@@ -92,13 +119,14 @@
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
         const posts = await res.json();
-        if(posts.length === 0) {
-            document.getElementById('feed').innerText = "Поки що тут порожньо. Напиши перший пост!";
-        } else {
-            document.getElementById('feed').innerHTML = posts.map(p => `
+        const feedDiv = document.getElementById('feed');
+        if (posts.length === 0) { feedDiv.innerText = "Поки що постів немає."; }
+        else {
+            feedDiv.innerHTML = posts.map(p => `
                 <div class="post">
-                    <b style="color: #0088cc;">@${p.username}</b>
+                    <b style="color:#0088cc;">@${p.username}</b>
                     <p>${p.content}</p>
+                    ${p.media_url ? `<small style="color:#555;">📎 Файл прикріплено</small>` : ''}
                 </div>
             `).join('');
         }
