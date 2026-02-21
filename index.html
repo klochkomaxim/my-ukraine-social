@@ -3,150 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UA Social AI</title>
+    <title>UA Social</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --tg-theme-bg: #1a1a1a; --tg-theme-button: #0088cc; }
-        body { font-family: Arial, sans-serif; background: #121212; color: white; margin: 0; padding-bottom: 80px; text-align: center; }
-        .card { background: #1e1e1e; border-radius: 15px; padding: 15px; margin: 15px; border: 1px solid #333; }
-        textarea { width: 90%; background: #2a2a2a; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; min-height: 80px; }
-        button { background: var(--tg-theme-button); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 8px; }
-        .post { background: #1e1e1e; margin: 15px; padding: 15px; border-radius: 12px; text-align: left; border-left: 4px solid #0088cc; }
-        #player { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; border-top: 2px solid #0088cc; padding: 15px; display: flex; align-items: center; justify-content: space-around; box-sizing: border-box; }
+        body { font-family: sans-serif; background: #121212; color: white; margin: 0; padding: 20px; text-align: center; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #333; }
+        textarea { width: 100%; box-sizing: border-box; background: #2a2a2a; color: white; border: none; padding: 10px; border-radius: 10px; }
+        button { background: #0088cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; margin-top: 10px; font-weight: bold; cursor: pointer; }
+        .post { background: #1e1e1e; padding: 15px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
+        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a1a; padding: 15px; border-top: 2px solid #0088cc; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-    <h2 style="margin-top:20px;">Привіт, <span id="user-name">Максим</span>! 🇺🇦</h2>
+    <h2>Привіт, <span id="user-name">Максим</span>! 🇺🇦</h2>
 
     <div class="card">
-        <textarea id="post-text" placeholder="Що цікавого сьогодні?"></textarea>
-        <button onclick="askAI()" style="background: #6a1b9a;">Допомога AI ✨</button>
-        <button onclick="document.getElementById('file-input').click()" style="background: #0288d1;">Додати медіа 📁</button>
-        <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
-        <button onclick="publishPost()" style="background: #2e7d32;">Опублікувати 🚀</button>
+        <textarea id="post-text" placeholder="Напиши щось..."></textarea>
+        <button onclick="publishPost()" id="pub-btn">Опублікувати 🚀</button>
     </div>
 
-    <div id="feed">
-        <p style="color: #666;">Завантаження стрічки...</p>
+    <div id="feed">Завантаження постів...</div>
+
+    <div id="player-ui">
+        <span style="font-size: 14px;">🎵 UA Radio</span>
+        <button onclick="playMusic()" id="play-btn" style="width: auto; margin: 0;">Увімкнути музику ▶</button>
     </div>
 
-   <div id="player" style="flex-direction: column; height: auto;">
-    <div id="yt-video" style="display:none;"></div> <div style="display: flex; align-items: center; justify-content: space-around; width: 100%;">
-        <span id="track-name">🎵 Українська музика 2024</span>
-        <button onclick="controlYT('play')" style="width: auto; padding: 5px 10px;">▶</button>
-        <button onclick="controlYT('pause')" style="width: auto; padding: 5px 10px;">⏸</button>
-        <button onclick="controlYT('next')" style="width: auto; padding: 5px 10px;">⏭</button>
-    </div>
-</div>
+    <iframe id="sc-player" style="display:none" width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" 
+        src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/playlists/1261543453&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true">
+    </iframe>
 
+<script src="https://w.soundcloud.com/player/api.js"></script>
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
     document.getElementById('user-name').innerText = tg.initDataUnsafe.user?.first_name || "Максим";
 
-    // ТВОЇ ДАНІ ЗІ СКРИНШОТІВ
+    // ДАНІ SUPABASE (ПЕРЕВІР ЇХ!)
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co"; 
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI"; // Встав сюди повний Anon Key
-    const GEMINI_KEY = "AIzaSyCnqveCi2gQzVAJCaORQYdA4P68adIArIg";
-    const BOT_TOKEN = "7951253178:AAGgUkn-6iXwGUSMe8aF3eWl916RP2dhg";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxMjEzOTYsImV4cCI6MjA1NTcwMTM5Nn0.2E7Lp8m6t0s3p6Z2X7Lp8m6t0s3p6Z2X7Lp8m6t0s3p"; 
 
-    let currentFileId = null;
-
-    async function askAI() {
-        const text = document.getElementById('post-text').value;
-        if (!text) return alert("Спочатку напиши щось!");
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_KEY}`, {
-            method: 'POST',
-            body: JSON.stringify({ contents: [{ parts: [{ text: "Зроби цей текст для української соцмережі кращим: " + text }] }] })
-        });
-        const data = await res.json();
-        document.getElementById('post-text').value = data.candidates[0].content.parts[0].text;
+    // Функція музики
+    const widget = SC.Widget(document.getElementById('sc-player'));
+    function playMusic() {
+        widget.play();
+        document.getElementById('play-btn').innerText = "Грає 🎵";
     }
 
-    async function handleFileUpload(input) {
-        const file = input.files[0];
-        const formData = new FormData();
-        formData.append('chat_id', tg.initDataUnsafe.user.id);
-        formData.append('document', file);
-        alert("Завантаження...");
-        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
-        const data = await res.json();
-        if(data.ok) {
-            currentFileId = data.result.document.file_id;
-            alert("Файл готовий!");
-        }
-    }
-
+    // Публікація
     async function publishPost() {
-        const content = document.getElementById('post-text').value;
-        await fetch(`${SB_URL}/rest/v1/posts`, {
-            method: 'POST',
-            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: tg.initDataUnsafe.user.id,
-                username: tg.initDataUnsafe.user.first_name || "Користувач",
-                content: content,
-                media_url: currentFileId
-            })
-        });
-        document.getElementById('post-text').value = "";
-        currentFileId = null;
-        loadFeed();
+        const text = document.getElementById('post-text').value;
+        const btn = document.getElementById('pub-btn');
+        if(!text) return alert("Порожньо!");
+        
+        btn.innerText = "Надсилаю...";
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/posts`, {
+                method: 'POST',
+                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: tg.initDataUnsafe.user?.first_name || "Гість",
+                    content: text
+                })
+            });
+            if(res.ok) {
+                document.getElementById('post-text').value = "";
+                loadFeed();
+            }
+        } catch(e) { alert("Помилка бази!"); }
+        btn.innerText = "Опублікувати 🚀";
     }
 
+    // Стрічка
     async function loadFeed() {
-        const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
-            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-        });
-        const posts = await res.json();
-        document.getElementById('feed').innerHTML = posts.map(p => `
-            <div class="post">
-                <b style="color:#0088cc;">@${p.username}</b>
-                <p>${p.content}</p>
-                ${p.media_url ? `<small style="color:#555;">📎 Файл ID: ${p.media_url}</small>` : ''}
-            </div>
-        `).join('');
-    }
-
-    function toggleMusic() {
-        const audio = document.getElementById('audio-element');
-        audio.paused ? audio.play() : audio.pause();
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
+                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+            });
+            const posts = await res.json();
+            document.getElementById('feed').innerHTML = posts.map(p => `
+                <div class="post">
+                    <b>@${p.username}</b>
+                    <p>${p.content}</p>
+                </div>
+            `).join('');
+        } catch(e) { document.getElementById('feed').innerText = "Помилка завантаження"; }
     }
 
     loadFeed();
 </script>
-<script src="https://www.youtube.com/iframe_api"></script>
-<script>
-    let ytPlayer;
-
-    function onYouTubeIframeAPIReady() {
-        ytPlayer = new YT.Player('yt-video', {
-            height: '0',
-            width: '0',
-            playerVars: {
-                'listType': 'playlist',
-                'list': 'PL7M38X9S0l_Xf1P0rMshP_e_G3L6vG_m9', // ID плейлиста з українськими хітами
-                'autoplay': 0,
-                'loop': 1
-            },
-            events: {
-                'onReady': onPlayerReady
-            }
-        });
-    }
-
-    function onPlayerReady(event) {
-        // Плеєр готовий
-    }
-
-    function controlYT(action) {
-        if (!ytPlayer) return;
-        if (action === 'play') ytPlayer.playVideo();
-        if (action === 'pause') ytPlayer.pauseVideo();
-        if (action === 'next') ytPlayer.nextVideo();
-    }
-</script>
 </body>
 </html>
-
