@@ -2,16 +2,20 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>UA Social</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 15px; text-align: center; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; color: white; margin: 0; padding: 15px; overflow-x: hidden; }
         .card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
-        textarea { width: 100%; box-sizing: border-box; background: #222; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; min-height: 60px; }
-        button { background: #0088cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .post { background: #111; padding: 12px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
-        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 15px; border-top: 1px solid #0088cc; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        textarea { width: 100%; box-sizing: border-box; background: #1a1a1a; color: white; border: 1px solid #333; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; transition: 0.3s; }
+        textarea:focus { border-color: #0088cc; }
+        .main-btn { background: #0088cc; color: white; border: none; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; -webkit-tap-highlight-color: transparent; }
+        .main-btn:active { background: #0077b3; transform: scale(0.98); }
+        .post { background: #111; padding: 12px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        #play-btn { background: #222; border: 1px solid #0088cc; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -19,34 +23,44 @@
     <h3 id="welcome">Привіт! 🇺🇦</h3>
 
     <div class="card">
-        <textarea id="post-text" placeholder="Напиши щось..."></textarea>
-        <button onclick="publishPost()" id="pub-btn">Опублікувати 🚀</button>
+        <textarea id="post-text" placeholder="Напиши щось цікаве..."></textarea>
+        <button onclick="publishPost()" id="pub-btn" class="main-btn">Опублікувати 🚀</button>
     </div>
 
-    <div id="feed">Завантаження...</div>
+    <div id="feed" style="padding-bottom: 80px;">Завантаження стрічки...</div>
 
     <div id="player-ui">
-        <span>🎵 Radio UA</span>
-        <button onclick="toggleAudio()" id="play-btn" style="width: auto; margin: 0; padding: 5px 20px;">Грати ▶</button>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">🎵</span>
+            <span style="font-size: 14px; font-weight: bold;">Radio UA Live</span>
+        </div>
+        <button onclick="toggleAudio()" id="play-btn">Грати ▶</button>
     </div>
 
-    <audio id="myAudio" src="https://online.radiobayraktar.com.ua/RadioBayraktar"></audio>
+    <audio id="myAudio" crossorigin="anonymous">
+        <source src="https://online.radiobayraktar.com.ua/RadioBayraktar" type="audio/mpeg">
+    </audio>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
+    tg.ready();
+    
     document.getElementById('welcome').innerText = "Привіт, " + (tg.initDataUnsafe.user?.first_name || "Максим") + "! 🇺🇦";
 
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co"; 
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI"; 
 
-    // Керування музикою
+    // Керування звуком
     const audio = document.getElementById('myAudio');
     function toggleAudio() {
         const btn = document.getElementById('play-btn');
         if (audio.paused) {
-            audio.play().catch(e => alert("Натисніть ще раз для звуку"));
-            btn.innerText = "Пауза ⏸";
+            audio.play().then(() => {
+                btn.innerText = "Пауза ⏸";
+            }).catch(e => {
+                alert("Натисніть ГРАТИ ще раз для активації звуку");
+            });
         } else {
             audio.pause();
             btn.innerText = "Грати ▶";
@@ -55,44 +69,66 @@
 
     // Публікація
     async function publishPost() {
-        const text = document.getElementById('post-text').value;
+        const textInput = document.getElementById('post-text');
         const btn = document.getElementById('pub-btn');
-        if(!text.trim()) return;
+        const content = textInput.value.trim();
+        
+        if(!content) return;
 
-        btn.disabled = true;
         btn.innerText = "Надсилаю...";
+        btn.disabled = true;
 
         try {
-            await fetch(`${SB_URL}/rest/v1/posts`, {
+            const response = await fetch(`${SB_URL}/rest/v1/posts`, {
                 method: 'POST',
-                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+                headers: { 
+                    'apikey': SB_KEY, 
+                    'Authorization': `Bearer ${SB_KEY}`, 
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
                 body: JSON.stringify({
                     username: tg.initDataUnsafe.user?.first_name || "Максим",
-                    content: text
+                    content: content
                 })
             });
-            document.getElementById('post-text').value = "";
-            loadFeed();
-        } catch(e) { alert("Помилка!"); }
-        
-        btn.disabled = false;
-        btn.innerText = "Опублікувати 🚀";
+
+            if (response.ok) {
+                textInput.value = "";
+                loadFeed();
+            } else {
+                alert("Помилка відправки. Перевір налаштування в Supabase.");
+            }
+        } catch(e) {
+            alert("Проблема зі зв'язком!");
+        } finally {
+            btn.innerText = "Опублікувати 🚀";
+            btn.disabled = false;
+        }
     }
 
-    // Стрічка
+    // Завантаження стрічки
     async function loadFeed() {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
                 headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
             });
             const posts = await res.json();
-            document.getElementById('feed').innerHTML = posts.map(p => `
-                <div class="post">
-                    <b style="color:#0088cc;">@${p.username}</b>
-                    <p style="margin:5px 0 0;">${p.content}</p>
-                </div>
-            `).join('');
-        } catch(e) { document.getElementById('feed').innerText = "Помилка оновлення"; }
+            const feedContainer = document.getElementById('feed');
+            
+            if (posts.length === 0) {
+                feedContainer.innerHTML = "<p style='color:#555; margin-top: 20px;'>Тут поки що порожньо...</p>";
+            } else {
+                feedContainer.innerHTML = posts.map(p => `
+                    <div class="post">
+                        <b style="color:#0088cc;">@${p.username}</b>
+                        <p style="margin:5px 0 0; line-height: 1.4;">${p.content}</p>
+                    </div>
+                `).join('');
+            }
+        } catch(e) {
+            document.getElementById('feed').innerText = "Помилка завантаження стрічки.";
+        }
     }
 
     loadFeed();
