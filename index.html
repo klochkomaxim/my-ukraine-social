@@ -7,97 +7,82 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root { --tg-theme-bg: #1a1a1a; --tg-theme-button: #0088cc; }
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding-bottom: 80px; }
-        .header { sticky; top: 0; background: #1a1a1a; padding: 15px; text-align: center; border-bottom: 1px solid #333; }
+        body { font-family: Arial, sans-serif; background: #121212; color: white; margin: 0; padding-bottom: 80px; text-align: center; }
         .card { background: #1e1e1e; border-radius: 15px; padding: 15px; margin: 15px; border: 1px solid #333; }
-        input, textarea { width: 90%; background: #2a2a2a; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
-        button { background: var(--tg-theme-button); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; }
-        .post { background: #1e1e1e; margin: 15px; padding: 15px; border-radius: 12px; border-left: 4px solid #0088cc; }
-        .post img, .post video { width: 100%; border-radius: 8px; margin-top: 10px; }
-        .post-author { font-weight: bold; color: #0088cc; margin-bottom: 5px; display: block; }
-        #player { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; border-top: 2px solid #0088cc; padding: 10px; display: flex; align-items: center; justify-content: space-around; }
-        .loading { text-align: center; color: #888; }
+        textarea { width: 90%; background: #2a2a2a; border: 1px solid #444; color: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; min-height: 80px; }
+        button { background: var(--tg-theme-button); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 8px; }
+        .post { background: #1e1e1e; margin: 15px; padding: 15px; border-radius: 12px; text-align: left; border-left: 4px solid #0088cc; }
+        #player { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; border-top: 2px solid #0088cc; padding: 15px; display: flex; align-items: center; justify-content: space-around; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h3>Р’С–С‚Р°СЋ, <span id="user-name">РљРѕР·Р°С‡Рµ</span>! рџ‡єрџ‡¦</h3>
-</div>
+    <h2 style="margin-top:20px;">Привіт, <span id="user-name">Максим</span>! 🇺🇦</h2>
 
-<div class="card">
-    <textarea id="post-text" placeholder="Р©Рѕ РЅРѕРІРѕРіРѕ?"></textarea>
-    <button onclick="askAI()" style="background: #6a1b9a; margin-bottom: 10px;">Р”РѕРїРѕРјРѕРіР° AI вњЁ</button>
-    <button onclick="document.getElementById('file-input').click()">Р”РѕРґР°С‚Рё РјРµРґС–Р° рџ“Ѓ</button>
-    <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
-    <button onclick="publishPost()" style="margin-top: 10px; background: #2e7d32;">РћРїСѓР±Р»С–РєСѓРІР°С‚Рё рџљЂ</button>
-</div>
+    <div class="card">
+        <textarea id="post-text" placeholder="Що цікавого сьогодні?"></textarea>
+        <button onclick="askAI()" style="background: #6a1b9a;">Допомога AI ✨</button>
+        <button onclick="document.getElementById('file-input').click()" style="background: #0288d1;">Додати медіа 📁</button>
+        <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
+        <button onclick="publishPost()" style="background: #2e7d32;">Опублікувати 🚀</button>
+    </div>
 
-<div id="feed">
-    <div class="loading">Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ СЃС‚СЂС–С‡РєРё...</div>
-</div>
+    <div id="feed">
+        <p style="color: #666;">Завантаження стрічки...</p>
+    </div>
 
-<div id="player">
-    <span id="track-name">рџЋµ UA Lounge</span>
-    <audio id="audio-element" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
-    <button onclick="toggleMusic()" style="width: auto;">вЏЇ Р“СЂР°С‚Рё/РџР°СѓР·Р°</button>
-</div>
+    <div id="player">
+        <span>🎵 UA Lounge</span>
+        <button onclick="toggleMusic()" style="width: auto; padding: 5px 15px;">⏯ Грати/Пауза</button>
+        <audio id="audio-element" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop></audio>
+    </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
-    document.getElementById('user-name').innerText = tg.initDataUnsafe.user?.first_name || "РљРѕСЂРёСЃС‚СѓРІР°С‡";
+    document.getElementById('user-name').innerText = tg.initDataUnsafe.user?.first_name || "Максим";
 
-    // РљРћРќР¤Р†Р“РЈР РђР¦Р†РЇ (Р’РЎРўРђР’ РЎР’РћР‡ Р”РђРќР† РўРЈРў)
+    // ТВОЇ ДАНІ ЗІ СКРИНШОТІВ
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co"; 
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI"; // Встав сюди повний Anon Key
     const GEMINI_KEY = "AIzaSyCnqveCi2gQzVAJCaORQYdA4P68adIArIg";
     const BOT_TOKEN = "7951253178:AAGgUkn-6iXwGUSMe8aF3eWl916RP2dhg";
 
     let currentFileId = null;
 
-    // 1. Р¤СѓРЅРєС†С–СЏ AI
     async function askAI() {
         const text = document.getElementById('post-text').value;
-        if (!text) return alert("РќР°РїРёС€Рё С…РѕС‡ СЃР»РѕРІРѕ!");
-        const btn = event.target; btn.innerText = "AI РґСѓРјР°С”...";
-        
+        if (!text) return alert("Спочатку напиши щось!");
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_KEY}`, {
             method: 'POST',
-            body: JSON.stringify({ contents: [{ parts: [{ text: "Р—СЂРѕР±Рё С†РµР№ С‚РµРєСЃС‚ РґР»СЏ СЃРѕС†РјРµСЂРµР¶С– С†С–РєР°РІС–С€РёРј СѓРєСЂР°С—РЅСЃСЊРєРѕСЋ: " + text }] }] })
+            body: JSON.stringify({ contents: [{ parts: [{ text: "Зроби цей текст для української соцмережі кращим: " + text }] }] })
         });
         const data = await res.json();
         document.getElementById('post-text').value = data.candidates[0].content.parts[0].text;
-        btn.innerText = "Р”РѕРїРѕРјРѕРіР° AI вњЁ";
     }
 
-    // 2. Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ С„Р°Р№Р»С–РІ Сѓ Telegram (Р‘РµР·РєРѕС€С‚РѕРІРЅРµ СЃС…РѕРІРёС‰Рµ)
     async function handleFileUpload(input) {
         const file = input.files[0];
         const formData = new FormData();
         formData.append('chat_id', tg.initDataUnsafe.user.id);
         formData.append('document', file);
-
-        alert("Р—Р°РІР°РЅС‚Р°Р¶СѓС”РјРѕ С„Р°Р№Р» Сѓ С…РјР°СЂСѓ...");
+        alert("Завантаження...");
         const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
         const data = await res.json();
         if(data.ok) {
             currentFileId = data.result.document.file_id;
-            alert("Р¤Р°Р№Р» РіРѕС‚РѕРІРёР№ РґРѕ РїСѓР±Р»С–РєР°С†С–С—!");
+            alert("Файл готовий!");
         }
     }
 
-    // 3. РџСѓР±Р»С–РєР°С†С–СЏ РІ Supabase
     async function publishPost() {
         const content = document.getElementById('post-text').value;
-        if(!content && !currentFileId) return;
-
         await fetch(`${SB_URL}/rest/v1/posts`, {
             method: 'POST',
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_id: tg.initDataUnsafe.user.id,
-                username: tg.initDataUnsafe.user.first_name,
+                username: tg.initDataUnsafe.user.first_name || "Користувач",
                 content: content,
                 media_url: currentFileId
             })
@@ -107,30 +92,26 @@
         loadFeed();
     }
 
-    // 4. Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ СЃС‚СЂС–С‡РєРё
     async function loadFeed() {
         const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
         const posts = await res.json();
-        const feedDiv = document.getElementById('feed');
-        feedDiv.innerHTML = posts.map(p => `
+        document.getElementById('feed').innerHTML = posts.map(p => `
             <div class="post">
-                <span class="post-author">@${p.username || 'РђРЅРѕРЅС–Рј'}</span>
-                <div>${p.content}</div>
-                ${p.media_url ? `<p style="font-size:10px; color:#555;">рџ“Ћ Р¤Р°Р№Р» РїСЂРёРєСЂС–РїР»РµРЅРѕ (ID: ${p.media_url})</p>` : ''}
+                <b style="color:#0088cc;">@${p.username}</b>
+                <p>${p.content}</p>
+                ${p.media_url ? `<small style="color:#555;">📎 Файл ID: ${p.media_url}</small>` : ''}
             </div>
         `).join('');
     }
 
-    // 5. РџР»РµС”СЂ
     function toggleMusic() {
         const audio = document.getElementById('audio-element');
         audio.paused ? audio.play() : audio.pause();
     }
 
-    loadFeed(); // Р—Р°РїСѓСЃРє РїСЂРё СЃС‚Р°СЂС‚С–
+    loadFeed();
 </script>
-
 </body>
 </html>
