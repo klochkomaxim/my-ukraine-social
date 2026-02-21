@@ -9,7 +9,120 @@
         body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 15px; text-align: center; }
         .card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
         textarea { width: 100%; box-sizing: border-box; background: #1a1a1a; color: white; border: 1px solid #333; padding: 12px; border-radius: 10px; font-size: 16px; min-height: 80px; }
-        .btn { background: #0088cc; color: white; border: none; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; }
+        .btn { background: #0088cc; color: wh<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UA Social</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 15px; text-align: center; }
+        .card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
+        textarea { width: 100%; box-sizing: border-box; background: #1a1a1a; color: white; border: 1px solid #333; padding: 12px; border-radius: 10px; font-size: 16px; min-height: 80px; margin-bottom: 10px; }
+        .btn { background: #0088cc; color: white; border: none; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .btn:active { background: #005f8d; }
+        .post { background: #111; padding: 12px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
+        #footer { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #333; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; }
+        #play-btn { background: #e53935; padding: 10px 20px; border-radius: 10px; border: none; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h3 id="user-title">UA Social 🇺🇦</h3>
+
+    <div class="card">
+        <textarea id="post-input" placeholder="Напиши щось..."></textarea>
+        <button onclick="sendPost()" id="send-btn" class="btn">Опублікувати 🚀</button>
+    </div>
+
+    <div id="feed">Завантаження стрічки...</div>
+
+    <div id="footer">
+        <span style="font-size: 14px;">🎵 Radio UA Live</span>
+        <button id="play-btn" onclick="handleMusic()">ГРАТИ ▶</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        document.getElementById('user-title').innerText = "Привіт, " + (tg.initDataUnsafe.user?.first_name || "Максим") + "!";
+
+        const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
+
+        // ЛОГІКА МУЗИКИ
+        let audio = new Audio("https://online.radioroks.ua/RadioROKS");
+        function handleMusic() {
+            const btn = document.getElementById('play-btn');
+            if (audio.paused) {
+                audio.play();
+                btn.innerText = "ПАУЗА ⏸";
+                btn.style.background = "#444";
+            } else {
+                audio.pause();
+                btn.innerText = "ГРАТИ ▶";
+                btn.style.background = "#e53935";
+            }
+        }
+
+        // ЛОГІКА ПОСТІВ
+        async function sendPost() {
+            const input = document.getElementById('post-input');
+            const btn = document.getElementById('send-btn');
+            if (!input.value.trim()) return;
+
+            btn.innerText = "Надсилаю...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/posts`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SB_KEY,
+                        'Authorization': `Bearer ${SB_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: tg.initDataUnsafe.user?.first_name || "Максим",
+                        content: input.value
+                    })
+                });
+                
+                if (res.ok) {
+                    input.value = "";
+                    loadFeed();
+                } else {
+                    alert("Помилка бази. Перевір SQL у Supabase!");
+                }
+            } catch (e) {
+                alert("Помилка мережі");
+            }
+            btn.innerText = "Опублікувати 🚀";
+            btn.disabled = false;
+        }
+
+        async function loadFeed() {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
+                    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+                });
+                const data = await res.json();
+                document.getElementById('feed').innerHTML = data.map(p => `
+                    <div class="post">
+                        <b style="color:#0088cc;">@${p.username}</b>
+                        <p style="margin:5px 0 0;">${p.content}</p>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('feed').innerText = "Стрічка порожня";
+            }
+        }
+
+        loadFeed();
+    </script>
+</body>
+</html>ite; border: none; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; }
         .btn:active { opacity: 0.7; }
         .post { background: #111; padding: 12px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
         #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 10px; border-top: 1px solid #333; box-sizing: border-box; z-index: 9999; }
@@ -90,3 +203,4 @@
 </script>
 </body>
 </html>
+
