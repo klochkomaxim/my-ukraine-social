@@ -6,142 +6,93 @@
     <title>UA Social</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 20px; padding-bottom: 120px; text-align: center; }
-        .card { background: #111; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #333; }
-        textarea { width: 100%; box-sizing: border-box; background: #222; color: white; border: none; padding: 12px; border-radius: 10px; margin-bottom: 10px; min-height: 80px; font-size: 16px; outline: none; }
-        button { border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 14px; color: white; transition: 0.3s; }
-        button:active { transform: scale(0.95); }
-        .post { background: #111; padding: 15px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
-        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 15px; border-top: 1px solid #0088cc; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; z-index: 1000; }
-        #yt-player { display: none; }
+        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 15px; text-align: center; }
+        .card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
+        textarea { width: 100%; box-sizing: border-box; background: #222; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 16px; min-height: 60px; }
+        button { background: #0088cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .post { background: #111; padding: 12px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
+        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 15px; border-top: 1px solid #0088cc; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-    <h2>Привіт, <span id="user-name">Максим</span>! 🇺🇦</h2>
+    <h3 id="welcome">Привіт! 🇺🇦</h3>
 
     <div class="card">
-        <textarea id="post-text" placeholder="Що цікавого сьогодні?"></textarea>
-        
-        <button onclick="askAI()" style="background: #6a1b9a;">Допомога AI ✨</button>
-        
-        <button onclick="document.getElementById('file-input').click()" style="background: #0288d1;">Додати медіа 📁</button>
-        <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
-        
-        <button onclick="publishPost()" id="pub-btn" style="background: #2e7d32;">Опублікувати 🚀</button>
+        <textarea id="post-text" placeholder="Напиши щось..."></textarea>
+        <button onclick="publishPost()" id="pub-btn">Опублікувати 🚀</button>
     </div>
 
     <div id="feed">Завантаження...</div>
 
-    <div id="yt-player"></div>
     <div id="player-ui">
-        <span style="font-size: 14px;">🎵 UA Radio Live</span>
-        <button onclick="toggleMusic()" id="play-btn" style="width: auto; margin: 0; padding: 8px 20px; background: #222; border: 1px solid #0088cc;">Грати ▶</button>
+        <span>🎵 Radio UA</span>
+        <button onclick="toggleAudio()" id="play-btn" style="width: auto; margin: 0; padding: 5px 20px;">Грати ▶</button>
     </div>
+
+    <audio id="myAudio" src="https://online.radiobayraktar.com.ua/RadioBayraktar"></audio>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
-    document.getElementById('user-name').innerText = tg.initDataUnsafe.user?.first_name || "Максим";
+    document.getElementById('welcome').innerText = "Привіт, " + (tg.initDataUnsafe.user?.first_name || "Максим") + "! 🇺🇦";
 
-    // ПЕРЕВІРЕНІ ДАНІ З ТВОЇХ СКРИНШОТІВ
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co"; 
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI"; 
 
-    let player;
-    let currentFileId = null;
-
-    // YouTube Плеєр
-    const tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.body.appendChild(tag);
-
-    function onYouTubeIframeAPIReady() {
-        player = new YT.Player('yt-player', {
-            height: '0', width: '0',
-            playerVars: { 'listType': 'playlist', 'list': 'PL7M38X9S0l_Xf1P0rMshP_e_G3L6vG_m9' }
-        });
-    }
-
-    function toggleMusic() {
-        if (!player) return;
-        const state = player.getPlayerState();
-        if (state === 1) { player.pauseVideo(); document.getElementById('play-btn').innerText = "Грати ▶"; }
-        else { player.playVideo(); document.getElementById('play-btn').innerText = "Пауза ⏸"; }
-    }
-
-    // AI Функція (спрощена для стабільності)
-    async function askAI() {
-        const text = document.getElementById('post-text').value;
-        if (!text) return alert("Напиши тему для AI!");
-        document.getElementById('post-text').value = "AI думає... ⌛";
-        
-        try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyCnqveCi2gQzVAJCaORQYdA4P68adIArIg`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Зроби цей текст кращим для української соцмережі: " + text }] }] })
-            });
-            const data = await res.json();
-            document.getElementById('post-text').value = data.candidates[0].content.parts[0].text;
-        } catch (e) { 
-            alert("AI зараз зайнятий, спробуй сам!"); 
-            document.getElementById('post-text').value = text;
-        }
-    }
-
-    // Завантаження файлів (заглушка для тесту)
-    function handleFileUpload(input) {
-        if(input.files[0]) {
-            currentFileId = "file_ready";
-            alert("Медіа додано! Натискай Опублікувати.");
+    // Керування музикою
+    const audio = document.getElementById('myAudio');
+    function toggleAudio() {
+        const btn = document.getElementById('play-btn');
+        if (audio.paused) {
+            audio.play().catch(e => alert("Натисніть ще раз для звуку"));
+            btn.innerText = "Пауза ⏸";
+        } else {
+            audio.pause();
+            btn.innerText = "Грати ▶";
         }
     }
 
     // Публікація
     async function publishPost() {
-        const content = document.getElementById('post-text').value;
+        const text = document.getElementById('post-text').value;
         const btn = document.getElementById('pub-btn');
-        if (!content.trim()) return;
-        
+        if(!text.trim()) return;
+
+        btn.disabled = true;
         btn.innerText = "Надсилаю...";
+
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/posts`, {
+            await fetch(`${SB_URL}/rest/v1/posts`, {
                 method: 'POST',
                 headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username: tg.initDataUnsafe.user?.first_name || "Максим",
-                    content: content,
-                    media_url: currentFileId
+                    content: text
                 })
             });
-            if (res.ok) {
-                document.getElementById('post-text').value = "";
-                currentFileId = null;
-                loadFeed();
-            }
-        } catch(e) { alert("Помилка з'єднання!"); }
+            document.getElementById('post-text').value = "";
+            loadFeed();
+        } catch(e) { alert("Помилка!"); }
+        
+        btn.disabled = false;
         btn.innerText = "Опублікувати 🚀";
     }
 
-    // Завантаження стрічки
+    // Стрічка
     async function loadFeed() {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
                 headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
             });
             const posts = await res.json();
-            const feedDiv = document.getElementById('feed');
-            if (!posts.length) { feedDiv.innerText = "Стрічка порожня. Напиши щось!"; }
-            else {
-                feedDiv.innerHTML = posts.map(p => `
-                    <div class="post">
-                        <b style="color:#0088cc;">@${p.username}</b>
-                        <p>${p.content}</p>
-                    </div>
-                `).join('');
-            }
-        } catch(e) { document.getElementById('feed').innerText = "Помилка бази."; }
+            document.getElementById('feed').innerHTML = posts.map(p => `
+                <div class="post">
+                    <b style="color:#0088cc;">@${p.username}</b>
+                    <p style="margin:5px 0 0;">${p.content}</p>
+                </div>
+            `).join('');
+        } catch(e) { document.getElementById('feed').innerText = "Помилка оновлення"; }
     }
 
     loadFeed();
