@@ -6,46 +6,57 @@
     <title>UA Social AI</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 20px; padding-bottom: 110px; text-align: center; }
-        .card { background: #111; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #333; }
-        textarea { width: 100%; box-sizing: border-box; background: #222; color: white; border: none; padding: 12px; border-radius: 10px; margin-bottom: 10px; min-height: 80px; font-size: 16px; }
-        button { background: #0088cc; color: white; border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 14px; }
-        .post { background: #111; padding: 15px; border-radius: 12px; margin-top: 10px; text-align: left; border-left: 4px solid #0088cc; }
-        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; padding: 15px; border-top: 1px solid #0088cc; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; z-index: 1000; }
-        #yt-api-player { display: none; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: white; margin: 0; padding: 20px; padding-bottom: 120px; text-align: center; }
+        .card { background: #111; padding: 20px; border-radius: 20px; border: 1px solid #333; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        textarea { width: 100%; box-sizing: border-box; background: #1a1a1a; color: white; border: 1px solid #444; padding: 15px; border-radius: 12px; font-size: 16px; outline: none; margin-bottom: 10px; }
+        button { border: none; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; margin-top: 10px; transition: 0.2s; color: white; }
+        button:active { transform: scale(0.98); }
+        
+        .btn-ai { background: linear-gradient(45deg, #6a1b9a, #8e24aa); }
+        .btn-media { background: #0288d1; }
+        .btn-pub { background: #2e7d32; }
+        
+        .post { background: #111; padding: 15px; border-radius: 15px; margin-top: 15px; text-align: left; border-left: 4px solid #0088cc; }
+        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #0088cc; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
+        #yt-player { display: none; }
     </style>
 </head>
 <body>
 
-    <h2>Привіт, <span id="user-name">Максим</span>! 🇺🇦</h2>
+    <h2 style="margin-bottom: 20px;">UA Social <span style="color: #0088cc;">AI</span></h2>
 
     <div class="card">
-        <textarea id="post-text" placeholder="Що цікавого сьогодні?"></textarea>
-        <button onclick="askAI()" style="background: #6a1b9a;">Допомога AI ✨</button>
-        <button onclick="document.getElementById('file-input').click()" style="background: #0288d1;">Додати фото/відео 📁</button>
+        <textarea id="post-text" placeholder="Про що хочеш написати?"></textarea>
+        
+        <button onclick="askAI()" class="btn-ai">Згенерувати текст AI ✨</button>
+        
+        <button onclick="document.getElementById('file-input').click()" class="btn-media">Додати фото/відео 📁</button>
         <input type="file" id="file-input" style="display:none" onchange="handleFileUpload(this)">
-        <button onclick="publishPost()" style="background: #2e7d32;">Опублікувати 🚀</button>
+        
+        <button onclick="publishPost()" id="pub-btn" class="btn-pub">Опублікувати пост 🚀</button>
     </div>
 
-    <div id="feed">Завантаження стрічки...</div>
+    <div id="feed">
+        <p style="color: #555;">Завантаження стрічки...</p>
+    </div>
 
-    <div id="yt-api-player"></div>
+    <div id="yt-player"></div>
     <div id="player-ui">
-        <span style="font-size: 14px;">🎵 UA Топ плейлист</span>
-        <button onclick="toggleMusic()" id="play-btn" style="width: auto; margin: 0; padding: 8px 20px; background: #222; border: 1px solid #0088cc;">Грати ▶</button>
+        <span id="track-name" style="font-size: 13px;">🎵 Український Chill</span>
+        <button onclick="toggleMusic()" id="play-btn" style="width: auto; margin: 0; padding: 10px 20px; background: #222; border: 1px solid #0088cc;">Грати ▶</button>
     </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
-    document.getElementById('user-name').innerText = tg.initDataUnsafe.user?.first_name || "Максим";
-
+    
+    // ТВОЇ ДАНІ
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co"; 
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI"; 
     const GEMINI_KEY = "AIzaSyCnqveCi2gQzVAJCaORQYdA4P68adIArIg";
     const BOT_TOKEN = "7951253178:AAGgUkn-6iXwGUSMe8aF3eWl916RP2dhg";
 
-    let player;
+    let ytPlayer;
     let currentFileId = null;
 
     // YouTube API
@@ -54,48 +65,67 @@
     document.body.appendChild(tag);
 
     function onYouTubeIframeAPIReady() {
-        player = new YT.Player('yt-api-player', {
+        ytPlayer = new YT.Player('yt-player', {
             height: '0', width: '0',
             playerVars: { 'listType': 'playlist', 'list': 'PL7M38X9S0l_Xf1P0rMshP_e_G3L6vG_m9' }
         });
     }
 
     function toggleMusic() {
-        if (!player) return;
-        const state = player.getPlayerState();
-        if (state === 1) { player.pauseVideo(); document.getElementById('play-btn').innerText = "Грати ▶"; }
-        else { player.playVideo(); document.getElementById('play-btn').innerText = "Пауза ⏸"; }
+        if (!ytPlayer) return;
+        const state = ytPlayer.getPlayerState();
+        if (state === 1) {
+            ytPlayer.pauseVideo();
+            document.getElementById('play-btn').innerText = "Грати ▶";
+        } else {
+            ytPlayer.playVideo();
+            document.getElementById('play-btn').innerText = "Пауза ⏸";
+        }
     }
 
-    // AI Функція
+    // AI
     async function askAI() {
         const text = document.getElementById('post-text').value;
-        if (!text) return alert("Напиши хоч слово!");
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_KEY}`, {
-            method: 'POST',
-            body: JSON.stringify({ contents: [{ parts: [{ text: "Зроби цей пост кращим для української соцмережі: " + text }] }] })
-        });
-        const data = await res.json();
-        document.getElementById('post-text').value = data.candidates[0].content.parts[0].text;
+        if (!text) return alert("Спочатку напиши тему!");
+        const btn = event.target;
+        btn.innerText = "AI пише...";
+        
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Напиши цікавий пост для соцмережі українською на тему: " + text }] }] })
+            });
+            const data = await res.json();
+            document.getElementById('post-text').value = data.candidates[0].content.parts[0].text;
+        } catch (e) { alert("AI втомився, спробуй пізніше."); }
+        btn.innerText = "Згенерувати текст AI ✨";
     }
 
-    // Завантаження файлів
+    // Завантаження медіа
     async function handleFileUpload(input) {
         const file = input.files[0];
+        if (!file) return;
+        alert("Завантажуємо у хмару Telegram...");
         const formData = new FormData();
-        formData.append('chat_id', tg.initDataUnsafe.user.id);
+        formData.append('chat_id', tg.initDataUnsafe.user?.id || 0);
         formData.append('document', file);
-        alert("Завантаження медіа...");
+        
         const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
         const data = await res.json();
-        if(data.ok) { currentFileId = data.result.document.file_id; alert("Файл додано!"); }
+        if (data.ok) {
+            currentFileId = data.result.document.file_id;
+            alert("Медіа готове!");
+        }
     }
 
     // Публікація
     async function publishPost() {
         const content = document.getElementById('post-text').value;
+        const btn = document.getElementById('pub-btn');
         if (!content && !currentFileId) return;
         
+        btn.innerText = "Публікуємо...";
         const res = await fetch(`${SB_URL}/rest/v1/posts`, {
             method: 'POST',
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
@@ -110,23 +140,26 @@
             document.getElementById('post-text').value = "";
             currentFileId = null;
             loadFeed();
-        } else { alert("Помилка публікації. Перевір SQL у Supabase!"); }
+        }
+        btn.innerText = "Опублікувати пост 🚀";
     }
 
-    // Стрічка
+    // Завантаження стрічки
     async function loadFeed() {
         const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
         const posts = await res.json();
         const feedDiv = document.getElementById('feed');
-        if (posts.length === 0) { feedDiv.innerText = "Поки що постів немає."; }
-        else {
+        
+        if (posts.length === 0) {
+            feedDiv.innerHTML = "<p style='color:#444;'>Тут поки що тихо...</p>";
+        } else {
             feedDiv.innerHTML = posts.map(p => `
                 <div class="post">
                     <b style="color:#0088cc;">@${p.username}</b>
                     <p>${p.content}</p>
-                    ${p.media_url ? `<small style="color:#555;">📎 Файл прикріплено</small>` : ''}
+                    ${p.media_url ? `<small style="color:#555;">📎 Файл додано</small>` : ''}
                 </div>
             `).join('');
         }
