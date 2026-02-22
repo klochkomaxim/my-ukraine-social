@@ -6,121 +6,73 @@
     <title>UA Social</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; background: #000; color: white; margin: 0; padding: 15px; text-align: center; }
+        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 15px; text-align: center; }
         .card { background: #111; padding: 15px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
-        textarea { width: 100%; box-sizing: border-box; background: #1a1a1a; color: white; border: 1px solid #333; padding: 12px; border-radius: 10px; font-size: 16px; min-height: 100px; resize: none; margin-bottom: 10px; outline: none; }
-        .btn { background: #0088cc; color: white; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; -webkit-tap-highlight-color: transparent; }
-        .btn:active { background: #0077b3; transform: scale(0.98); }
+        textarea { width: 100%; box-sizing: border-box; background: #1a1a1a; color: white; border: 1px solid #333; padding: 12px; border-radius: 10px; font-size: 16px; min-height: 100px; margin-bottom: 10px; outline: none; }
+        .btn { background: #0088cc; color: white; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .btn:active { background: #0077b3; }
         #feed { margin-top: 20px; padding-bottom: 100px; text-align: left; }
-        .post { background: #111; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid #0088cc; animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(10px); padding: 15px; border-top: 1px solid #333; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; z-index: 9999; }
+        .post { background: #111; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid #0088cc; }
+        #player-ui { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #333; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; }
         #play-btn { background: #e53935; padding: 10px 20px; border-radius: 10px; border: none; color: white; font-weight: bold; }
     </style>
 </head>
 <body>
-
-    <h3 id="user-greeting">UA Social 🇺🇦</h3>
-
+    <h3>Привіт, Максим! 🇺🇦</h3>
     <div class="card">
-        <textarea id="post-input" placeholder="Напиши щось цікаве..."></textarea>
+        <textarea id="post-input" placeholder="Напиши щось..."></textarea>
         <button onclick="sendPost()" id="send-btn" class="btn">Опублікувати 🚀</button>
     </div>
-
-    <div id="feed">Завантаження постів...</div>
-
+    <div id="feed">Завантаження стрічки...</div>
     <div id="player-ui">
-        <div style="text-align: left;">
-            <div style="font-size: 14px; font-weight: bold;">Radio ROKS 🎸</div>
-            <div style="font-size: 11px; color: #888;">Статус: Музика готова</div>
-        </div>
+        <div style="text-align: left;"><div style="font-size: 14px; font-weight: bold;">UA Radio Live</div></div>
         <button id="play-btn" onclick="handleMusic()">ГРАТИ ▶</button>
     </div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        const userName = tg.initDataUnsafe.user?.first_name || "Максим";
-        document.getElementById('user-greeting').innerText = "Привіт, " + userName + "!";
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
 
-        const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
+    const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
-        // МУЗИКА
-        let audio = new Audio("https://online.radioroks.ua/RadioROKS");
-        function handleMusic() {
-            const btn = document.getElementById('play-btn');
-            if (audio.paused) {
-                audio.play();
-                btn.innerText = "ПАУЗА ⏸";
-                btn.style.background = "#444";
-            } else {
-                audio.pause();
-                btn.innerText = "ГРАТИ ▶";
-                btn.style.background = "#e53935";
-            }
-        }
+    let audio = new Audio("https://online.radioroks.ua/RadioROKS");
+    function handleMusic() {
+        const btn = document.getElementById('play-btn');
+        if (audio.paused) { audio.play(); btn.innerText = "ПАУЗА ⏸"; } 
+        else { audio.pause(); btn.innerText = "ГРАТИ ▶"; }
+    }
 
-        // ПОСТИ
-        async function sendPost() {
-            const input = document.getElementById('post-input');
-            const btn = document.getElementById('send-btn');
-            const content = input.value.trim();
-            
-            if (!content) return;
+    async function sendPost() {
+        const input = document.getElementById('post-input');
+        const btn = document.getElementById('send-btn');
+        if (!input.value.trim()) return;
+        btn.disabled = true;
 
-            btn.innerText = "Надсилаю...";
-            btn.disabled = true;
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/posts`, {
+                method: 'POST',
+                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: "Максим", content: input.value })
+            });
+            if (res.ok) { input.value = ""; loadFeed(); }
+            else { alert("Помилка! Перевір SQL у Supabase."); }
+        } catch (e) { alert("Немає зв'язку"); }
+        btn.disabled = false;
+    }
 
-            try {
-                const res = await fetch(`${SB_URL}/rest/v1/posts`, {
-                    method: 'POST',
-                    headers: {
-                        'apikey': SB_KEY,
-                        'Authorization': `Bearer ${SB_KEY}`,
-                        'Content-Type': 'application/json',
-                        'Prefer': 'return=minimal'
-                    },
-                    body: JSON.stringify({ username: userName, content: content })
-                });
-                
-                if (res.ok) {
-                    input.value = "";
-                    loadFeed();
-                } else {
-                    alert("Помилка! Виконай Крок 1 в Supabase.");
-                }
-            } catch (e) {
-                alert("Проблема з мережею");
-            }
-            btn.innerText = "Опублікувати 🚀";
-            btn.disabled = false;
-        }
-
-        async function loadFeed() {
-            try {
-                const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
-                    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-                });
-                const data = await res.json();
-                const feedDiv = document.getElementById('feed');
-                
-                if (data.length === 0) {
-                    feedDiv.innerHTML = "<p style='color:#666; text-align:center;'>Тут поки що порожньо...</p>";
-                } else {
-                    feedDiv.innerHTML = data.map(p => `
-                        <div class="post">
-                            <b style="color:#0088cc;">@${p.username}</b>
-                            <p style="margin:5px 0 0; line-height: 1.4;">${p.content}</p>
-                        </div>
-                    `).join('');
-                }
-            } catch (e) {
-                document.getElementById('feed').innerText = "Помилка завантаження стрічки";
-            }
-        }
-
-        loadFeed();
-    </script>
+    async function loadFeed() {
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/posts?select=*&order=created_at.desc`, {
+                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+            });
+            const data = await res.json();
+            document.getElementById('feed').innerHTML = data.map(p => `
+                <div class="post"><b>@${p.username}</b><p>${p.content}</p></div>
+            `).join('');
+        } catch (e) { document.getElementById('feed').innerText = "Помилка стрічки"; }
+    }
+    loadFeed();
+</script>
 </body>
 </html>
