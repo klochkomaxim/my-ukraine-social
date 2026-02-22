@@ -6,25 +6,25 @@
     <title>UA Social</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: #fff; margin: 0; padding: 15px; }
+        body { font-family: sans-serif; background: #000; color: #fff; margin: 0; padding: 15px; overflow-x: hidden; }
         .card { background: #111; padding: 15px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; }
-        textarea { width: 100%; height: 80px; background: #1a1a1a; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 8px; font-size: 16px; box-sizing: border-box; outline: none; }
-        .btn { background: #0088cc; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; margin-top: 10px; font-size: 16px; }
-        #feed { margin-top: 20px; padding-bottom: 80px; text-align: left; }
-        .post { background: #111; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid #0088cc; }
-        #player { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
-        #play-btn { background: #e53935; color: #fff; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
+        textarea { width: 100%; height: 80px; background: #1a1a1a; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 8px; font-size: 16px; box-sizing: border-box; outline: none; resize: none; }
+        .btn { background: #0088cc; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; margin-top: 10px; font-size: 16px; cursor: pointer; }
+        .btn:disabled { opacity: 0.5; }
+        #feed { margin-top: 20px; padding-bottom: 100px; }
+        .post { background: #111; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid #0088cc; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        #player { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 1000; }
+        #play-btn { background: #e53935; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="main-ui">
-        <h3>UA Social: Максим 🇺🇦</h3>
-        <div class="card">
-            <textarea id="msg" placeholder="Напиши щось..."></textarea>
-            <button onclick="sendPost()" id="btn" class="btn">Опублікувати 🚀</button>
-        </div>
-        <div id="feed">Завантаження...</div>
+    <h3>UA Social 🇺🇦</h3>
+    <div class="card">
+        <textarea id="msg" placeholder="Напиши щось цікаве..."></textarea>
+        <button onclick="sendPost()" id="btn" class="btn">Опублікувати 🚀</button>
     </div>
+    <div id="feed">Завантаження стрічки...</div>
 
     <div id="player">
         <span>Radio Rocks UA 🎸</span>
@@ -35,59 +35,83 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const URL = "https://qappwloefuraalqfcekl.supabase.co";
+    // ВАЖЛИВО: Перевір, щоб в кінці URL НЕ БУЛО зайвих слешів
+    const BASE_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
     let audio = new Audio("https://online.radioroks.ua/RadioROKS");
     function toggle() {
         const b = document.getElementById('play-btn');
-        if (audio.paused) { audio.play(); b.innerText = "ПАУЗА"; }
+        if (audio.paused) { audio.play().catch(e => alert("Натисніть ще раз")); b.innerText = "ПАУЗА"; }
         else { audio.pause(); b.innerText = "ГРАТИ"; }
     }
 
     async function sendPost() {
         const msg = document.getElementById('msg');
         const btn = document.getElementById('btn');
-        if (!msg.value.trim()) return;
+        const text = msg.value.trim();
+        if (!text) return;
 
         btn.disabled = true;
         btn.innerText = "Надсилаю...";
 
         try {
-            const res = await fetch(URL, {
+            const response = await fetch(BASE_URL, {
                 method: 'POST',
-                headers: { 
-                    'apikey': KEY, 
-                    'Authorization': `Bearer ${KEY}`, 
+                headers: {
+                    'apikey': KEY,
+                    'Authorization': `Bearer ${KEY}`,
                     'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
+                    'Prefer': 'return=representation' // Змінено для кращої відповіді від бази
                 },
-                body: JSON.stringify({ username: "Максим", content: msg.value })
+                body: JSON.stringify({ 
+                    username: "Максим", 
+                    content: text 
+                })
             });
 
-            if (res.ok) {
+            if (response.ok) {
                 msg.value = "";
-                loadPosts();
+                setTimeout(loadPosts, 500); // Невелика затримка перед оновленням
             } else {
-                const err = await res.text();
-                alert("Помилка бази: " + err);
+                const errorData = await response.json();
+                alert("Помилка: " + (errorData.message || "Невідома помилка"));
             }
-        } catch (e) { alert("Помилка мережі"); }
-        btn.disabled = false;
-        btn.innerText = "Опублікувати 🚀";
+        } catch (e) {
+            alert("Помилка з'єднання з базою. Перевір інтернет.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Опублікувати 🚀";
+        }
     }
 
     async function loadPosts() {
         try {
-            const res = await fetch(URL + "?select=*&order=created_at.desc", {
-                headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}` }
+            const response = await fetch(`${BASE_URL}?select=*&order=created_at.desc`, {
+                headers: {
+                    'apikey': KEY,
+                    'Authorization': `Bearer ${KEY}`
+                }
             });
-            const data = await res.json();
-            document.getElementById('feed').innerHTML = data.map(p => `
-                <div class="post"><b>@${p.username}</b><p style="margin:5px 0 0;">${p.content}</p></div>
-            `).join('');
-        } catch (e) { document.getElementById('feed').innerText = "Стрічка порожня"; }
+            const data = await response.json();
+            const feed = document.getElementById('feed');
+            
+            if (data.length === 0) {
+                feed.innerText = "Стрічка порожня. Будь першим!";
+            } else {
+                feed.innerHTML = data.map(p => `
+                    <div class="post">
+                        <b style="color: #0088cc;">@${p.username}</b>
+                        <p style="margin: 8px 0 0; line-height: 1.4;">${p.content}</p>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            document.getElementById('feed').innerText = "Не вдалося завантажити стрічку.";
+        }
     }
+
+    // Завантажити при старті
     loadPosts();
 </script>
 </body>
