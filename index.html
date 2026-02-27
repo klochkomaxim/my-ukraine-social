@@ -3,92 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Warehouse Pro</title>
+    <title>Warehouse Scan Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --main: #0088cc; --bg: #0f172a; --card: #1e293b; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
-        .header { text-align: center; padding: 10px 0; border-bottom: 1px solid #334155; margin-bottom: 20px; }
-        .card { background: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; text-align: center; }
+        .card { background: var(--card); padding: 20px; border-radius: 16px; margin-bottom: 15px; border: 1px solid #334155; }
         input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; }
-        .btn { background: var(--main); color: white; border: none; padding: 14px; width: 100%; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn { background: var(--main); color: white; border: none; padding: 14px; width: 100%; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; }
         #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-top: 10px; display: none; }
-        .log-item { background: #334155; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 14px; border-left: 4px solid var(--main); }
-        .status { color: #94a3b8; font-size: 12px; margin-top: 5px; text-align: center; }
+        #status { margin-top: 10px; font-size: 14px; color: #94a3b8; }
+        .last-scan { background: #334155; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 13px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2 style="margin:0;">Warehouse Scan Pro 📦</h2>
-    </div>
+    <h2>Складський Облік 📦</h2>
 
     <div class="card">
-        <label>Назва складу:</label>
-        <input type="text" id="whName" placeholder="Наприклад: Склад №1" value="Головний склад">
-        
-        <button id="scanBtn" class="btn" onclick="startScanner()">
-            📷 Запустити Сканер
-        </button>
+        <input type="text" id="whName" placeholder="Назва складу" value="Склад 1">
+        <button id="scanBtn" class="btn" onclick="startScanner()">📷 Почати сканування</button>
         <div id="reader"></div>
-        <p class="status" id="status">Готовий до роботи</p>
+        <div id="status">Очікування...</div>
     </div>
 
-    <div id="logs"></div>
+    <div id="lastResult" class="last-scan" style="display:none;"></div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const URL = "https://qappwloefuraalqfcekl.supabase.co/rest/v1/scans";
-    const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxMjEzOTYsImV4cCI6MjA1NTcwMTM5Nn0.2E7Lp8m6t0s3p6Z2X7Lp8m6t0s3p6Z2X7Lp8m6t0s3p";
+    const SB_URL = "https://qappwloefuraalqfcekl.supabase.co/rest/v1/scans";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxMjEzOTYsImV4cCI6MjA1NTcwMTM5Nn0.2E7Lp8m6t0s3p6Z2X7Lp8m6t0s3p6Z2X7Lp8m6t0s3p";
 
     let html5QrCode;
 
     function startScanner() {
         document.getElementById('reader').style.display = 'block';
+        document.getElementById('scanBtn').style.display = 'none';
+        
         html5QrCode = new Html5Qrcode("reader");
         
-        const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+        const config = { 
+            fps: 20, 
+            qrbox: { width: 250, height: 150 },
+            aspectRatio: 1.0,
+            // АВТОФОКУС ТА ПОКРАЩЕННЯ ЯКОСТІ
+            videoConstraints: {
+                focusMode: "continuous",
+                facingMode: "environment"
+            }
+        };
 
         html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
-        document.getElementById('scanBtn').style.display = 'none';
     }
 
     async function onScanSuccess(decodedText, decodedResult) {
-        const wh = document.getElementById('whName').value;
-        document.getElementById('status').innerText = "Надсилаю: " + decodedText;
+        // Зупиняємо сканер на секунду, щоб не було дублів
+        html5QrCode.pause(true);
         
-        // Вібрація при успіху
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        const wh = document.getElementById('whName').value;
+        document.getElementById('status').innerText = "Обробка: " + decodedText;
+
+        // Дані для бази
+        const payload = {
+            warehouse_name: wh,
+            code_data: decodedText,
+            username: tg.initDataUnsafe?.user?.first_name || "Користувач"
+        };
 
         try {
-            const res = await fetch(URL, {
+            // 1. Надсилаємо в Supabase
+            const res = await fetch(SB_URL, {
                 method: 'POST',
                 headers: { 
-                    'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 
-                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' 
+                    'apikey': SB_KEY, 
+                    'Authorization': `Bearer ${SB_KEY}`, 
+                    'Content-Type': 'application/json' 
                 },
-                body: JSON.stringify({
-                    warehouse_name: wh,
-                    code_data: decodedText,
-                    code_type: decodedResult.result.format.formatName,
-                    username: tg.initDataUnsafe?.user?.first_name || "Максим"
-                })
+                body: JSON.stringify(payload)
             });
 
-            if (res.ok) {
-                addLog(wh, decodedText);
-            }
-        } catch (e) { alert("Помилка відправки"); }
-    }
+            // 2. Повідомляємо бота (через Haptic та візуально)
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            
+            // Показуємо результат на екрані
+            const resDiv = document.getElementById('lastResult');
+            resDiv.style.display = 'block';
+            resDiv.innerHTML = `✅ Відправлено: <b>${decodedText}</b>`;
 
-    function addLog(wh, code) {
-        const log = document.getElementById('logs');
-        const item = document.createElement('div');
-        item.className = 'log-item';
-        item.innerHTML = `<b>${wh}</b>: ${code}<br><small>${new Date().toLocaleTimeString()}</small>`;
-        log.prepend(item);
+            // 3. Якщо треба закрити WebApp і надіслати текст в чат:
+            // tg.sendData(JSON.stringify(payload)); 
+
+        } catch (e) {
+            alert("Помилка зв'язку");
+        }
+
+        // Чекаємо 2 секунди і продовжуємо сканування
+        setTimeout(() => {
+            html5QrCode.resume();
+            document.getElementById('status').innerText = "Готовий до наступного коду";
+        }, 2000);
     }
 </script>
 </body>
