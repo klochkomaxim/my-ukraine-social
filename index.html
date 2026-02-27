@@ -3,188 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UA СКЛАД PRO</title>
+    <title>UA SKЛАД FINAL</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        :root { --blue: #0057b7; --yellow: #ffd700; }
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .header { background: var(--blue); color: white; padding: 15px; text-align: center; border-radius: 0 0 20px 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .scanner-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; position: relative; }
-        #reader { width: 100% !important; max-width: 400px; border-radius: 20px; overflow: hidden; border: 4px solid white; background: #000; }
-        .btn { width: 90%; max-width: 400px; background: white; border: 2px solid var(--blue); color: var(--blue); padding: 15px; border-radius: 15px; font-weight: bold; margin-top: 15px; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        #debug-log { font-size: 11px; background: #222; padding: 10px; height: 100px; overflow-y: auto; color: #0f0; line-height: 1.4; border-top: 2px solid var(--yellow); font-family: monospace; }
-        #status { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 4px solid var(--yellow); padding: 25px; border-radius: 25px; z-index: 100; display: none; text-align: center; width: 75%; box-shadow: 0 15px 50px rgba(0,0,0,0.3); }
+        body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 0; text-align: center; }
+        #reader { width: 100% !important; max-width: 400px; margin: 20px auto; border: 2px solid #0057b7; border-radius: 15px; overflow: hidden; }
+        .btn { background: #0057b7; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-weight: bold; margin: 10px; width: 80%; }
+        #debug { background: #000; color: #0f0; font-size: 11px; padding: 10px; text-align: left; height: 150px; overflow-y: auto; font-family: monospace; border-top: 2px solid #ffd700; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
     </style>
 </head>
 <body>
 
-<div id="status">
-    <h1 id="status-icon" style="margin:0;">🔎</h1>
-    <h3 id="status-title" style="margin: 10px 0; color: var(--blue);">Обробка...</h3>
-    <p id="status-desc" style="font-weight: bold; margin: 0; color: #333;"></p>
+<div id="overlay">
+    <h1 id="ov-icon">🔎</h1>
+    <h2 id="ov-title">ПОШУК...</h2>
+    <p id="ov-desc"></p>
 </div>
 
-<div class="header">
+<div style="background: #0057b7; padding: 15px;">
     <h2 style="margin:0;">UA СКЛАД 🇺🇦</h2>
-    <div style="font-size: 12px; opacity: 0.9;">Система керування запасами</div>
 </div>
 
-<div class="scanner-container">
-    <div id="reader"></div>
-    <button class="btn" onclick="handleTorch()">🔦 УВІМКНУТИ ЛІХТАРИК</button>
-</div>
+<div id="reader"></div>
+<button class="btn" onclick="location.reload()">🔄 ПЕРЕЗАПУСТИТИ</button>
 
-<div id="debug-log">> Система готова. Чекаю на скан...</div>
+<div id="debug">> Система завантажується...</div>
 
 <script>
     const tg = window.Telegram.WebApp;
-    tg.expand();
-
-    // КОНФІГУРАЦІЯ (Supabase + Telegram)
     const BOT_TOKEN = "8434922111:AAGEEoBwKba5ZO0r7FnAusEc31XIV_oAjtw"; 
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
 
-    let isBusy = false;
-    let html5QrCode = new Html5Qrcode("reader");
-
-    function log(msg, color = "#0f0") {
-        const d = document.getElementById('debug-log');
-        d.innerHTML = `<span style="color:${color}">> ${msg}</span><br>` + d.innerHTML;
+    function log(msg) {
+        const d = document.getElementById('debug');
+        d.innerHTML = `> ${msg}<br>` + d.innerHTML;
     }
 
-    // Запуск камери з налаштуваннями для iPhone
-    html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 20, qrbox: { width: 250, height: 150 } },
-        onScanSuccess
-    ).catch(e => log("Помилка камери: " + e, "red"));
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, onScan);
 
-    async function onScanSuccess(code) {
-        if (isBusy) return;
-        isBusy = true;
-        
-        try { await html5QrCode.pause(); } catch(e) {}
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        
-        showStatus("🔎", "ШУКАЮ В БАЗІ", code);
-        log("Скановано код: " + code, "#00ccff");
+    async function onScan(code) {
+        log("Знайдено код: " + code);
+        html5QrCode.pause();
+        showOv("🔎", "ПОШУК", code);
 
-        // 1. Пошук товару
-        let name = await getProductName(code);
-
-        // 2. Якщо не знайдено - запит назви
-        if (!name) {
-            name = prompt(`Новий товар! Код: ${code}\nВведіть назву:`);
-            if (!name) {
-                name = "Невідомий товар";
-            } else {
-                await saveToCatalog(code, name);
-            }
-        }
-
-        showStatus("✅", "УСПІШНО", name);
-        
-        // 3. Логування та сповіщення
-        await logScan(code, name);
-        sendToTelegram(code, name);
-
-        setTimeout(async () => {
-            hideStatus();
-            try { await html5QrCode.resume(); } catch(e) {}
-            isBusy = false;
-        }, 2500);
-    }
-
-    // ФУНКЦІЇ РОБОТИ З БАЗОЮ (Через CORS Proxy)
-    async function getProductName(code) {
+        // 1. ПОШУК
+        let name = null;
         try {
-            const target = `${SB_URL}/product_catalog?barcode=eq.${code}&select=name`;
-            const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(target);
-            
-            const res = await fetch(proxyUrl, {
+            const res = await fetch(`${SB_URL}/product_catalog?barcode=eq.${code}`, {
                 headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
             });
             const data = await res.json();
-            return (data && data.length > 0) ? data[0].name : null;
-        } catch (e) { 
-            log("Пошук через проксі...", "yellow");
-            return null; 
+            if (data.length > 0) name = data[0].name;
+        } catch(e) { log("Помилка читання: " + e.message); }
+
+        // 2. ВВЕДЕННЯ ЯКЩО НЕМАЄ
+        if (!name) {
+            name = prompt("Назва товару:");
+            if (name) {
+                try {
+                    const save = await fetch(`${SB_URL}/product_catalog`, {
+                        method: 'POST',
+                        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ barcode: code, name: name })
+                    });
+                    if (save.ok) log("Збережено в базу!");
+                    else log("Помилка бази: " + save.statusText);
+                } catch(e) { log("Помилка збереження: " + e.message); }
+            }
         }
+
+        // 3. ТЕЛЕГРАМ ТА СКАН-ЛОГ
+        sendTG(code, name || "Без назви");
+        
+        showOv("✅", "ГОТОВО", name || "Скан відправлено");
+        setTimeout(() => { hideOv(); html5QrCode.resume(); }, 2000);
     }
 
-    async function saveToCatalog(code, name) {
-        try {
-            const target = `${SB_URL}/product_catalog`;
-            const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(target);
-            
-            await fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 
-                    'apikey': SB_KEY, 
-                    'Authorization': `Bearer ${SB_KEY}`, 
-                    'Content-Type': 'application/json',
-                    'Prefer': 'resolution=merge-duplicates' 
-                },
-                body: JSON.stringify({ barcode: code, name: name })
-            });
-            log("Додано в каталог", "#0f0");
-        } catch(e) { log("Помилка каталогу", "red"); }
-    }
-
-    async function logScan(code, name) {
-        try {
-            const target = `${SB_URL}/scans`;
-            const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(target);
-            
-            await fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 
-                    'apikey': SB_KEY, 
-                    'Authorization': `Bearer ${SB_KEY}`, 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({ 
-                    warehouse_name: "Головний", 
-                    code_data: code, 
-                    product_name: name, 
-                    username: tg.initDataUnsafe?.user?.first_name || "Користувач" 
-                })
-            });
-            log("Запис у базі створено", "#0f0");
-        } catch(e) { log("Помилка запису скану", "red"); }
-    }
-
-    // ТЕЛЕГРАМ ТА КАМЕРА
-    function sendToTelegram(c, n) {
-        const text = `📦 *НОВИЙ СКАН*\n━━━━━━━━━━━━\n🔹 *Товар:* ${n}\n🔢 *Код:* \`${c}\` \n📍 *Склад:* Головний`;
+    function sendTG(c, n) {
+        const text = `📦 СКЛАД: ${n}\n🔢 Код: ${c}`;
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST', 
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: tg.initDataUnsafe?.user?.id, text: text, parse_mode: 'Markdown' })
-        }).then(() => log("Telegram сповіщено", "#00ccff"))
-          .catch(() => log("Telegram Error", "red"));
+            body: JSON.stringify({ chat_id: tg.initDataUnsafe?.user?.id, text: text })
+        }).then(() => log("Надіслано в Telegram")).catch(e => log("TG помилка: " + e.message));
     }
 
-    function handleTorch() {
-        const video = document.querySelector('#reader video');
-        if (video && video.srcObject) {
-            const track = video.srcObject.getVideoTracks()[0];
-            const settings = track.getSettings();
-            track.applyConstraints({ advanced: [{ torch: !settings.torch }] })
-                 .catch(() => log("Ліхтарик не підтримується", "yellow"));
-        }
+    function showOv(i,t,d) {
+        document.getElementById('ov-icon').innerText = i;
+        document.getElementById('ov-title').innerText = t;
+        document.getElementById('ov-desc').innerText = d;
+        document.getElementById('overlay').style.display = 'flex';
     }
-
-    function showStatus(i, t, d) {
-        document.getElementById('status-icon').innerText = i;
-        document.getElementById('status-title').innerText = t;
-        document.getElementById('status-desc').innerText = d;
-        document.getElementById('status').style.display = 'block';
-    }
-    function hideStatus() { document.getElementById('status').style.display = 'none'; }
+    function hideOv() { document.getElementById('overlay').style.display = 'none'; }
 </script>
 </body>
 </html>
