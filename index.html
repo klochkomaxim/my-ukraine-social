@@ -3,42 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UA Warehouse Ultra Scan</title>
+    <title>UA Warehouse Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --blue: #0057b7; --yellow: #ffd700; }
-        body { font-family: -apple-system, sans-serif; background: #f4f7f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f7f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         .header { background: var(--blue); color: white; padding: 15px; text-align: center; border-radius: 0 0 20px 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .scanner-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #reader { width: 100% !important; max-width: 380px; border-radius: 25px; overflow: hidden; border: 4px solid white; box-shadow: 0 15px 35px rgba(0,0,0,0.1); background: #000; }
-        .btn-focus { width: 100%; max-width: 380px; background: white; border: 2px solid var(--blue); color: var(--blue); padding: 15px; border-radius: 15px; font-weight: bold; margin-top: 15px; }
+        #reader { width: 100% !important; max-width: 400px; border-radius: 25px; overflow: hidden; border: 4px solid white; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .btn-focus { width: 100%; max-width: 400px; background: white; border: 2px solid var(--blue); color: var(--blue); padding: 16px; border-radius: 16px; font-weight: bold; margin-top: 15px; font-size: 16px; }
         
+        /* СТИЛЬ ВІКНА РЕЗУЛЬТАТУ */
         #status-overlay {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: white; border: 4px solid var(--yellow); padding: 25px; border-radius: 30px; 
-            text-align: center; z-index: 9999; width: 85%; display: none; box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+            background: white; border: 4px solid var(--yellow); padding: 30px; border-radius: 30px; 
+            text-align: center; z-index: 9999; width: 85%; display: none; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
         }
-        .active { display: block !important; }
+        .active { display: block !important; animation: pop 0.3s cubic-bezier(0.17, 0.89, 0.32, 1.2); }
+        @keyframes pop { from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
 
     <div id="status-overlay">
-        <h1 id="ov-icon">⏳</h1>
-        <h3 id="ov-title" style="color: var(--blue); margin: 10px 0;">Шукаю всюди...</h3>
-        <p id="ov-desc" style="font-weight: bold; font-size: 14px; color: #333;"></p>
-        <div id="manual-link" style="margin-top:10px; font-size: 12px; color: var(--blue); display:none;"></div>
+        <h1 id="ov-icon" style="font-size: 50px; margin: 0;">🔎</h1>
+        <h3 id="ov-title" style="color: var(--blue); margin: 15px 0;">Обробка...</h3>
+        <p id="ov-desc" style="font-weight: bold; font-size: 18px; color: #333; margin: 0;"></p>
     </div>
 
     <div class="header">
-        <h2 style="margin:0;">СКЛАД 🇺🇦 УЛЬТРА</h2>
+        <h2 style="margin:0;">UA СКЛАД 🇺🇦</h2>
         <div id="whLabel" style="font-size: 13px; opacity: 0.9;">Налаштування...</div>
     </div>
 
     <div class="scanner-container">
         <div id="reader"></div>
-        <button class="btn-focus" onclick="boostCamera()">🔦 ЛІХТАРИК + ФОКУС</button>
+        <button class="btn-focus" onclick="boostCamera()">🔦 ЛІХТАРИК + АВТОФОКУС</button>
     </div>
 
 <script>
@@ -50,29 +51,35 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
 
-    let warehouse = prompt("Назва складу:", "Головний") || "Склад";
+    let warehouse = prompt("Назва складу:", "Основний") || "Склад";
     document.getElementById('whLabel').innerText = "Склад: " + warehouse;
 
     const html5QrCode = new Html5Qrcode("reader");
-    let isProcessing = false;
+    let isBusy = false;
     let videoTrack = null;
 
-    html5QrCode.start({ facingMode: "environment" }, { fps: 24, qrbox: { width: 280, height: 160 } }, onScanSuccess)
-        .then(() => { videoTrack = html5QrCode.getRunningTrack(); });
+    // СТАРТ СКАНЕРА З ПАРАМЕТРАМИ ДЛЯ IPHONE
+    html5QrCode.start({ facingMode: "environment" }, { 
+        fps: 20, 
+        qrbox: { width: 280, height: 160 },
+        videoConstraints: { focusMode: "continuous", width: {ideal: 1280}, height: {ideal: 720} }
+    }, onScanSuccess).then(() => { videoTrack = html5QrCode.getRunningTrack(); });
 
     async function onScanSuccess(code) {
-        if (isProcessing) return;
-        isProcessing = true;
-        html5QrCode.pause();
+        if (isBusy) return;
+        isBusy = true;
+        
+        try {
+            await html5QrCode.pause(true); // Пауза з заморозкою кадру
+        } catch(e) { console.log("Pause error"); }
 
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        showOverlay("🔎", "ПОШУК В УСІХ БАЗАХ", code);
+        showOverlay("🔎", "ПОШУК В БАЗАХ", code);
 
-        // МУЛЬТИ-ПОШУК
-        let name = await multiSearch(code);
+        let name = await ultraSearch(code);
 
         if (!name) {
-            name = prompt(`Не знайдено в мережі. Введіть назву товару для коду ${code}:`);
+            name = prompt(`Код ${code} не знайдено.\nВведіть назву товару:`);
             if (name) {
                 await saveToCatalog(code, name);
             } else {
@@ -80,47 +87,45 @@
             }
         }
 
-        showOverlay("✅", "ПРОСКАНОВАНО", name);
+        showOverlay("✅", "УСПІШНО", name);
         
         await logScan(code, name);
         sendToBot(code, name);
 
-        setTimeout(() => {
+        // Даємо 3 секунди подивитись на результат
+        setTimeout(async () => {
             hideOverlay();
-            html5QrCode.resume();
-            isProcessing = false;
-        }, 2500);
+            try {
+                await html5QrCode.resume();
+            } catch(e) { console.log("Resume error"); }
+            isBusy = false;
+        }, 3000);
     }
 
-    async function multiSearch(code) {
+    async function ultraSearch(code) {
+        // 1. Своя база (Supabase) - ЗАВЖДИ ПЕРША
         try {
-            // 1. Перевірка своєї бази (Supabase) - найшвидше
             const res = await fetch(`${SB_URL}/product_catalog?barcode=eq.${code}`, {
                 headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
             });
             const data = await res.json();
             if (data && data.length > 0) return data[0].name;
+        } catch(e) { console.error("Supabase error", e); }
 
-            // 2. Паралельний запит до глобальних баз (хто швидше)
-            const results = await Promise.allSettled([
-                fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`).then(r => r.json()),
-                fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`).then(r => r.json())
-            ]);
-
-            for (let res of results) {
-                if (res.status === 'fulfilled') {
-                    let d = res.value;
-                    // Перевірка Open Food Facts
-                    if (d.status === 1) return await translate(d.product.product_name || d.product.generic_name);
-                    // Перевірка UPC Database
-                    if (d.items && d.items.length > 0) return await translate(d.items[0].title);
-                }
+        // 2. Open Food Facts (окремий блок)
+        try {
+            const off = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+            const oData = await off.json();
+            if (oData && oData.status === 1) {
+                let n = oData.product.product_name || oData.product.generic_name;
+                return await translateUA(n);
             }
-        } catch (e) { console.error("Search error", e); }
+        } catch(e) { console.log("OFF API Error"); }
+
         return null;
     }
 
-    async function translate(text) {
+    async function translateUA(text) {
         try {
             const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=uk&dt=t&q=${encodeURIComponent(text)}`);
             const d = await res.json();
@@ -131,29 +136,28 @@
     async function saveToCatalog(code, name) {
         return fetch(`${SB_URL}/product_catalog`, {
             method: 'POST',
-            headers: { 
-                'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 
-                'Content-Type': 'application/json',
-                'Prefer': 'resolution=merge-duplicates' 
-            },
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
             body: JSON.stringify({ barcode: code, name: name })
-        });
+        }).catch(e => console.log("Catalog save error", e));
     }
 
     async function logScan(code, name) {
         return fetch(`${SB_URL}/scans`, {
             method: 'POST',
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ warehouse_name: warehouse, code_data: code, product_name: name, username: tg.initDataUnsafe?.user?.first_name || "Склад-Юзер" })
-        });
+            body: JSON.stringify({ warehouse_name: warehouse, code_data: code, product_name: name, username: tg.initDataUnsafe?.user?.first_name || "User" })
+        }).catch(e => console.log("Log save error", e));
     }
 
     function boostCamera() {
         if (!videoTrack) return;
         const s = videoTrack.getSettings();
         videoTrack.applyConstraints({
-            advanced: [{ zoom: 1.2 }, { torch: !s.torch }, { focusMode: "continuous" }]
-        }).catch(() => {});
+            advanced: [{ zoom: 1.3 }, { torch: !s.torch }, { focusMode: "continuous" }]
+        }).catch(() => {
+            // Якщо зум не підтримується, просто блимаємо ліхтариком
+            videoTrack.applyConstraints({advanced: [{torch: !s.torch}]});
+        });
     }
 
     function showOverlay(icon, title, desc) {
@@ -171,7 +175,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: tg.initDataUnsafe?.user?.id, text: msg, parse_mode: 'Markdown' })
-        });
+        }).catch(e => console.log("Bot error"));
     }
 </script>
 </body>
