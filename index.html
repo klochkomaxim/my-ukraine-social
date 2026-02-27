@@ -3,49 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UA Склад Сканер Pro</title>
+    <title>UA Склад Сканер Ultra</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        :root { --ua-blue: #0057b7; --ua-yellow: #ffd700; --bg: #f1f5f9; }
-        body { 
-            font-family: -apple-system, system-ui, sans-serif; 
-            background: var(--bg); margin: 0; padding: 15px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        .header { width: 100%; text-align: center; padding: 20px 0; background: var(--ua-blue); color: white; border-radius: 0 0 20px 20px; margin: -15px -15px 20px -15px; }
-        .card { background: white; width: 100%; max-width: 400px; padding: 15px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); box-sizing: border-box; }
-        #reader { width: 100% !important; border-radius: 20px; overflow: hidden; border: 3px solid #e2e8f0; }
-        .btn-flash { width: 100%; background: #e2e8f0; border: none; padding: 15px; border-radius: 15px; font-weight: bold; margin-top: 15px; color: #475569; }
+        :root { --blue: #0057b7; --yellow: #ffd700; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
         
-        /* ЦЕНТРАЛЬНЕ ВІКНО SUCCESS */
-        #successOverlay {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: white; border: 4px solid var(--ua-yellow); padding: 40px;
-            border-radius: 35px; text-align: center; z-index: 9999; width: 70%;
-            display: none; box-shadow: 0 0 50px rgba(0,0,0,0.2);
-        }
-        .show { display: block !important; animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes pop { 0% { transform: translate(-50%, -50%) scale(0.5); } 100% { transform: translate(-50%, -50%) scale(1); } }
+        .header { background: var(--blue); color: white; padding: 20px; text-align: center; border-radius: 0 0 25px 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        .scanner-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        
+        #reader { width: 100% !important; max-width: 350px; border-radius: 20px; overflow: hidden; border: 5px solid white; box-shadow: 0 20px 40px rgba(0,0,0,0.2); background: #000; }
+        
+        .controls { width: 100%; max-width: 350px; margin-top: 20px; }
+        .btn { background: white; border: 2px solid var(--blue); color: var(--blue); padding: 15px; width: 100%; border-radius: 15px; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
+        .btn-main { background: var(--blue); color: white; border: none; }
+
+        /* ВЕЛИКЕ ВІКНО УСПІХУ */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; z-index: 10000; align-items: center; justify-content: center; }
+        .modal { background: white; width: 85%; padding: 40px 20px; border-radius: 35px; text-align: center; border: 6px solid var(--yellow); animation: zoomIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        @keyframes zoomIn { from { transform: scale(0.5); } to { transform: scale(1); } }
+        
+        .modal h1 { color: var(--blue); margin: 0 0 10px 0; font-size: 28px; }
+        .modal p { font-size: 18px; font-weight: bold; color: #333; }
     </style>
 </head>
 <body>
 
-    <div id="successOverlay">
-        <h1 style="font-size: 50px; margin: 0;">✅</h1>
-        <h2 style="color: var(--ua-blue); margin: 10px 0;">УСПІХ!</h2>
-        <p id="itemName" style="font-weight: bold;"></p>
+    <div id="overlay">
+        <div class="modal">
+            <h1>✅ ГОТОВО</h1>
+            <p id="resName">Шукаємо назву...</p>
+            <button class="btn btn-main" onclick="closeModal()">OK</button>
+        </div>
     </div>
 
     <div class="header">
         <h2 style="margin:0;">UA СКЛАД 🇺🇦</h2>
-        <small id="whDisplay">Склад: завантаження...</small>
+        <div id="whNameDisp" style="opacity: 0.8; font-size: 14px;">Склад не визначено</div>
     </div>
 
-    <div class="card">
+    <div class="scanner-container">
         <div id="reader"></div>
-        <button class="btn-flash" onclick="toggleFlash()">🔦 ЛІХТАРИК / ФОКУС</button>
-        <div id="status" style="margin-top:15px; text-align:center; color: #64748b; font-size: 13px;">Наведіть камеру на код</div>
+        
+        <div class="controls">
+            <button class="btn" onclick="toggleFlash()">🔦 ЛІХТАРИК / ФОКУС</button>
+            <div id="status" style="text-align: center; color: #666; font-size: 14px;">Наведіть на штрих-код</div>
+        </div>
     </div>
 
 <script>
@@ -56,111 +61,119 @@
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
+    let warehouse = prompt("Який сьогодні склад?", "Головний") || "Загальний";
+    document.getElementById('whNameDisp').innerText = "Склад: " + warehouse;
 
-    let warehouse = prompt("Введіть назву складу:", "Склад №1") || "Склад №1";
-    document.getElementById('whDisplay').innerText = "Склад: " + warehouse;
-
-    let lastCode = "";
-    let isProcessing = false;
+    let isScanning = true;
     let videoTrack = null;
 
-    // ФУНКЦІЯ ПЕРЕКЛАДУ
-    async function translate(text) {
-        try {
-            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=uk&dt=t&q=${encodeURIComponent(text)}`);
-            const data = await res.json();
-            return data[0][0][0];
-        } catch { return text; }
+    // СКАНЕР З НАЛАШТУВАННЯМИ ПІД IPHONE
+    const html5QrCode = new Html5Qrcode("reader");
+    const config = { 
+        fps: 25, 
+        qrbox: { width: 280, height: 150 }, // Вузька зона краща для штрих-кодів
+        aspectRatio: 1.0,
+        videoConstraints: {
+            facingMode: "environment",
+            focusMode: "continuous",
+            // Для iPhone важливо не ставити занадто високу якість, щоб не було лагів
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        }
+    };
+
+    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .then(() => {
+            videoTrack = html5QrCode.getRunningTrack();
+            applyUltraFocus();
+        });
+
+    function applyUltraFocus() {
+        if (!videoTrack) return;
+        const capabilities = videoTrack.getCapabilities();
+        
+        // ХИТРІСТЬ ДЛЯ IPHONE: Цифрове наближення (Zoom)
+        // Це змушує камеру сфокусуватися на об'єкті, який здається ближчим
+        if (capabilities.zoom) {
+            videoTrack.applyConstraints({ advanced: [{ zoom: 1.2 }, { focusMode: "continuous" }] }).catch(()=>{});
+        }
     }
 
-    // ПОШУК ТОВАРУ (ГЛОБАЛЬНИЙ)
-    async function findProduct(code) {
+    async function onScanSuccess(decodedText) {
+        if (!isScanning) return;
+        isScanning = false;
+
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        document.getElementById('status').innerText = "🔎 Глобальний пошук товару...";
+
+        let name = await deepSearch(decodedText);
+
+        if (!name) {
+            name = prompt(`Код ${decodedText} не знайдено. Введіть назву:`);
+            if (!name) name = "Невідомий товар";
+        }
+
+        // Відображення результату
+        document.getElementById('resName').innerText = name;
+        document.getElementById('overlay').style.display = 'flex';
+
+        // Відправка
+        saveToCatalog(decodedText, name);
+        saveScan(name, decodedText);
+        sendToBot(name, decodedText);
+    }
+
+    // ПОТУЖНИЙ ПОШУК (БАЗИ + ПЕРЕКЛАД)
+    async function deepSearch(code) {
         try {
-            // 1. Своя база
+            // 1. Власна база
             const local = await fetch(`${SB_URL}/product_catalog?barcode=eq.${code}`, {
                 headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
             });
             const lData = await local.json();
             if (lData.length > 0) return lData[0].name;
 
-            // 2. Open Food Facts
+            // 2. Глобальна база продуктів
             const off = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
             const oData = await off.json();
             if (oData.status === 1) {
-                return await translate(oData.product.product_name || oData.product.generic_name);
+                let n = oData.product.product_name || oData.product.generic_name;
+                return await translateUA(n);
             }
-        } catch (e) {}
+
+            // 3. Універсальна база штрих-кодів (Open Repo)
+            const upc = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+            const uData = await upc.json();
+            if (uData.items && uData.items.length > 0) {
+                return await translateUA(uData.items[0].title);
+            }
+        } catch (e) { console.log("Search error"); }
         return null;
     }
 
-    // НАЛАШТУВАННЯ СКАНЕРА (ОПТИМІЗОВАНО ПІД IPHONE)
-    const html5QrCode = new Html5Qrcode("reader");
-    const qrConfig = { 
-        fps: 20, 
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.0,
-        videoConstraints: {
-            facingMode: "environment",
-            width: { ideal: 1280 }, // iPhone краще працює з 720p ніж з 1080p у браузері
-            height: { ideal: 720 },
-            focusMode: "continuous"
-        }
-    };
-
-    html5QrCode.start({ facingMode: "environment" }, qrConfig, onScanSuccess)
-        .then(() => { 
-            videoTrack = html5QrCode.getRunningTrack(); 
-            // Спроба покращити фокус для iOS через секунду
-            setTimeout(() => {
-                if(videoTrack) videoTrack.applyConstraints({advanced: [{focusMode: "continuous"}]}).catch(()=>{});
-            }, 1000);
-        });
-
-    async function onScanSuccess(decodedText) {
-        if (isProcessing) return; // Захист від зависання та повторів
-        isProcessing = true;
-
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
-        document.getElementById('status').innerText = "🔎 Шукаю в Google та базах...";
-        let name = await findProduct(decodedText);
-
-        if (!name) {
-            name = prompt(`Товар не знайдено (${decodedText}). Введіть назву:`);
-            if (!name) name = "Невідомий товар";
-        }
-
-        // Записуємо в каталог
-        saveToCatalog(decodedText, name);
-
-        // Показуємо результат
-        document.getElementById('itemName').innerText = name;
-        const overlay = document.getElementById('successOverlay');
-        overlay.classList.add('show');
-
-        // Відправляємо дані
-        saveScan(name, decodedText);
-        sendToBot(name, decodedText);
-
-        // Через 3 секунди дозволяємо сканувати знову
-        setTimeout(() => {
-            overlay.classList.remove('show');
-            isProcessing = false;
-            document.getElementById('status').innerText = "Готовий до сканування";
-        }, 3000);
+    async function translateUA(text) {
+        try {
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=uk&dt=t&q=${encodeURIComponent(text)}`);
+            const d = await res.json();
+            return d[0][0][0];
+        } catch { return text; }
     }
 
     function toggleFlash() {
         if (!videoTrack) return;
-        const cap = videoTrack.getCapabilities();
-        if (cap.torch) {
-            videoTrack.applyConstraints({advanced: [{torch: !videoTrack.getSettings().torch}]});
-        }
-        // iPhone часто потребує "ручного" поштовху для фокусу
-        videoTrack.applyConstraints({advanced: [{focusMode: "continuous"}]}).catch(()=>{});
+        const torch = !videoTrack.getSettings().torch;
+        videoTrack.applyConstraints({ advanced: [{ torch: torch }, { focusMode: "continuous" }] }).catch(()=>{});
+        // Повторний зум при натисканні
+        applyUltraFocus();
     }
 
-    // ФУНКЦІЇ БАЗИ
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        isScanning = true;
+        document.getElementById('status').innerText = "Наведіть на штрих-код";
+    }
+
+    // ФУНКЦІЇ БАЗИ ДАНИХ
     function saveToCatalog(code, name) {
         fetch(`${SB_URL}/product_catalog`, {
             method: 'POST',
