@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Warehouse Scan Pro + Flash</title>
+    <title>Скан PRO MAX</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
@@ -11,9 +11,9 @@
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
         .card { background: var(--card); padding: 15px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 15px; }
         input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; outline: none; }
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #334155; }
         .controls { display: flex; gap: 10px; margin-top: 10px; }
-        .btn-flash { flex: 1; background: var(--accent); color: #000; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-flash { flex: 1; background: var(--accent); color: #000; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
         .status-box { margin-top: 15px; padding: 12px; border-radius: 10px; font-size: 14px; text-align: center; font-weight: bold; }
         .info { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
         .success { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
@@ -22,25 +22,22 @@
 <body>
 
     <div class="card">
-        <h3 style="margin: 0 0 15px 0; text-align: center;">📦 Склад Pro + 🔦</h3>
+        <h3 style="margin: 0 0 15px 0; text-align: center;">📦 Швидке Сканування</h3>
         <input type="text" id="whName" placeholder="Назва складу..." value="Головний Склад">
         
         <div id="reader"></div>
 
         <div class="controls">
-            <button id="flashBtn" class="btn-flash" onclick="toggleFlash()">
-                🔦 ЛІХТАРИК
-            </button>
+            <button id="flashBtn" class="btn-flash" onclick="toggleFlash()">🔦 ЛІХТАРИК</button>
         </div>
         
-        <div id="status" class="status-box info">Наведіть на код (автофокус увімкнено)</div>
+        <div id="status" class="status-box info">Сканер активний (чекаю на код)</div>
     </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // КОНФІГУРАЦІЯ
     const BOT_TOKEN = "8434922111:AAGEEoBwKba5ZO0r7FnAusEc31XIV_oAjtw"; 
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
@@ -50,6 +47,7 @@
     let isFlashOn = false;
     let videoTrack = null;
 
+    // Ініціалізація сканера БЕЗ зупинки після успіху
     const html5QrCode = new Html5Qrcode("reader");
 
     const config = { 
@@ -57,99 +55,86 @@
         qrbox: { width: 260, height: 160 },
         videoConstraints: {
             facingMode: { exact: "environment" },
-            focusMode: "continuous",
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            focusMode: "continuous"
         }
     };
 
-    // ЗАПУСК СКАНЕРА
+    // Запуск (використовуємо функцію, яка не блокує потік)
     html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
         .then(() => {
-            // Отримуємо доступ до відеотреку для керування фокусом та спалахом
             videoTrack = html5QrCode.getRunningTrack();
-            applyAdvancedSettings();
+            // Спроба примусового автофокусу через 1 секунду після старту
+            setTimeout(applyAdvancedSettings, 1000);
         })
-        .catch(err => console.error("Camera error:", err));
+        .catch(err => console.error(err));
 
     function applyAdvancedSettings() {
         if (!videoTrack) return;
-        const capabilities = videoTrack.getCapabilities();
-        
-        // Примусовий автофокус, якщо підтримується
-        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-            videoTrack.applyConstraints({
-                advanced: [{ focusMode: 'continuous' }]
-            }).catch(e => console.log("Focus constraint error", e));
+        const cap = videoTrack.getCapabilities();
+        if (cap.focusMode && cap.focusMode.includes('continuous')) {
+            videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
         }
     }
 
-    // КЕРУВАННЯ ЛІХТАРИКОМ
     async function toggleFlash() {
         if (!videoTrack) return;
-        const capabilities = videoTrack.getCapabilities();
-
-        if (capabilities.torch) {
+        const cap = videoTrack.getCapabilities();
+        if (cap.torch) {
             isFlashOn = !isFlashOn;
-            try {
-                await videoTrack.applyConstraints({
-                    advanced: [{ torch: isFlashOn }]
-                });
-                document.getElementById('flashBtn').style.background = isFlashOn ? "#fff" : "#f59e0b";
-            } catch (e) {
-                alert("Ліхтарик не підтримується на цьому пристрої");
-            }
+            await videoTrack.applyConstraints({ advanced: [{ torch: isFlashOn }] });
+            document.getElementById('flashBtn').innerText = isFlashOn ? "🔦 ВИМКНУТИ" : "🔦 ЛІХТАРИК";
         } else {
-            alert("Камера не підтримує керування ліхтариком через браузер");
+            alert("Ваш пристрій не дозволяє вмикати ліхтарик через браузер.");
         }
     }
 
     async function onScanSuccess(decodedText) {
         const now = Date.now();
-        if (decodedText === lastResult && (now - lastTime) < 3000) return;
+        
+        // ПАУЗА: Не скануємо той самий код частіше ніж раз на 2 секунди
+        if (decodedText === lastResult && (now - lastTime) < 2000) return;
 
         lastResult = decodedText;
         lastTime = now;
 
-        const warehouse = document.getElementById('whName').value || "Не вказано";
+        // Візуальний відгук
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        updateStatus("✅ Відправлено: " + decodedText, "success");
 
-        updateStatus("Надсилаю: " + decodedText, "success");
+        const wh = document.getElementById('whName').value || "Склад";
 
-        await Promise.all([
-            sendToSupabase(warehouse, decodedText),
-            sendToTelegram(warehouse, decodedText)
-        ]);
+        // Відправляємо дані (не чекаємо на відповідь, щоб не гальмувати сканер)
+        sendToSupabase(wh, decodedText);
+        sendToTelegram(wh, decodedText);
+
+        // Через 1.5 секунди повертаємо статус "Готовий"
+        setTimeout(() => {
+            if (Date.now() - lastTime >= 1500) {
+                updateStatus("Сканер активний (чекаю на код)", "info");
+            }
+        }, 1500);
     }
 
     async function sendToSupabase(wh, code) {
         try {
             await fetch(SB_URL, {
                 method: 'POST',
-                headers: { 
-                    'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 
-                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' 
-                },
-                body: JSON.stringify({
-                    warehouse_name: wh,
-                    code_data: code,
-                    username: tg.initDataUnsafe?.user?.first_name || "Максим"
-                })
+                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ warehouse_name: wh, code_data: code, username: tg.initDataUnsafe?.user?.first_name || "Користувач" })
             });
-        } catch (e) { console.error("DB Error", e); }
+        } catch (e) {}
     }
 
     async function sendToTelegram(wh, code) {
         const chatId = tg.initDataUnsafe?.user?.id;
         if (!chatId) return;
-        const text = `📦 *Scan:* \`${code}\`\n🏭 *Warehouse:* ${wh}`;
         try {
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'Markdown' })
+                body: JSON.stringify({ chat_id: chatId, text: `📦 *Код:* \`${code}\`\n🏭 *Склад:* ${wh}`, parse_mode: 'Markdown' })
             });
-        } catch (e) { console.error("TG Error", e); }
+        } catch (e) {}
     }
 
     function updateStatus(msg, type) {
