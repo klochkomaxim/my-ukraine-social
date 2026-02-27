@@ -3,79 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner Pro</title>
+    <title>Склад-Сканер Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: white; margin: 0; padding: 15px; }
-        .card { background: #111; padding: 15px; border-radius: 12px; border: 1px solid #333; }
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; }
-        .btn { background: #22c55e; color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; margin-top: 10px; }
+        :root { --primary: #22c55e; --bg: #0f172a; --card: #1e293b; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; overflow-x: hidden; }
+        .card { background: var(--card); padding: 15px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 15px; }
+        input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--primary); }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #334155; }
+        .status-box { margin-top: 15px; padding: 12px; border-radius: 10px; font-size: 14px; text-align: center; font-weight: bold; transition: 0.3s; }
+        .success { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
+        .error { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+        .info { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <input type="text" id="whName" placeholder="Назва складу" style="width:100%; padding:10px; background:#222; color:white; border:none; border-radius:8px;">
+        <h3 style="margin: 0 0 15px 0; text-align: center;">📦 Складський Облік</h3>
+        <input type="text" id="whName" placeholder="Введіть назву складу..." value="Головний Склад">
+        
         <div id="reader"></div>
-        <div id="result" style="margin-top:10px; color:#22c55e;">Готовий до сканування...</div>
+        
+        <div id="status" class="status-box info">Наведіть камеру на код</div>
     </div>
+
+    <div id="logs" style="padding-bottom: 50px;"></div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const URL = "https://qappwloefuraalqfcekl.supabase.co/rest/v1/scans";
-    const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxMjEzOTYsImV4cCI6MjA1NTcwMTM5Nn0.2E7Lp8m6t0s3p6Z2X7Lp8m6t0s3p6Z2X7Lp8m6t0s3p";
+    // КОНФІГУРАЦІЯ (Зміни токен!)
+    const BOT_TOKEN = "8434922111:AAGEEoBwKba5ZO0r7FnAusEc31XIV_oAjtw"; 
+    const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
     let lastResult = "";
-    let lastScanTime = 0;
+    let lastTime = 0;
 
+    // 1. НАЛАШТУВАННЯ СКАНЕРА ТА АВТОФОКУСУ
     const html5QrCode = new Html5Qrcode("reader");
-
-    // Запуск сканера з фокусом на задню камеру
-    html5QrCode.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: { width: 250, height: 150 } },
-        async (decodedText) => {
-            const now = Date.now();
-            // Захист від спаму: той самий код можна сканувати лише раз на 3 секунди
-            if (decodedText === lastResult && (now - lastScanTime) < 3000) return;
-
-            lastResult = decodedText;
-            lastScanTime = now;
-
-            document.getElementById('result').innerText = "Відправляю: " + decodedText;
-            await sendToSupabase(decodedText);
+    const config = { 
+        fps: 20, 
+        qrbox: { width: 280, height: 180 },
+        aspectRatio: 1.0,
+        videoConstraints: {
+            facingMode: "environment",
+            focusMode: "continuous", // Автофокус
+            whiteBalanceMode: "continuous"
         }
-    );
+    };
 
-    async function sendToSupabase(code) {
+    // 2. ЗАПУСК
+    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .catch(err => updateStatus("Помилка камери: " + err, "error"));
+
+    // 3. ОБРОБКА СКАНУВАННЯ
+    async function onScanSuccess(decodedText) {
+        const now = Date.now();
+        // Захист від повторів (3 секунди)
+        if (decodedText === lastResult && (now - lastTime) < 3000) return;
+
+        lastResult = decodedText;
+        lastTime = now;
+
+        const warehouse = document.getElementById('whName').value || "Не вказано";
+        updateStatus("Відправка: " + decodedText, "info");
+
+        // Вібрація
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+        // Відправляємо всюди паралельно
+        await Promise.all([
+            sendToSupabase(warehouse, decodedText),
+            sendToTelegram(warehouse, decodedText)
+        ]);
+    }
+
+    // 4. ВІДПРАВКА В SUPABASE (для Excel)
+    async function sendToSupabase(wh, code) {
         try {
-            const response = await fetch(URL, {
+            const res = await fetch(SB_URL, {
                 method: 'POST',
                 headers: { 
-                    'apikey': KEY, 
-                    'Authorization': `Bearer ${KEY}`, 
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
+                    'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' 
                 },
                 body: JSON.stringify({
-                    warehouse_name: document.getElementById('whName').value || "Без назви",
+                    warehouse_name: wh,
                     code_data: code,
                     username: tg.initDataUnsafe?.user?.first_name || "Максим"
                 })
             });
+            if (res.ok) updateStatus("✅ Записано в базу та Бот", "success");
+            else updateStatus("❌ Помилка бази (CORS?)", "error");
+        } catch (e) { updateStatus("❌ Помилка мережі", "error"); }
+    }
 
-            if (response.ok) {
-                document.getElementById('result').innerText = "✅ Успішно: " + code;
-                if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-            } else {
-                document.getElementById('result').innerText = "❌ Помилка бази (див. CORS)";
-            }
-        } catch (e) {
-            document.getElementById('result').innerText = "❌ Мережа: " + e.message;
-        }
+    // 5. ПРЯМА ВІДПРАВКА В БОТ (сповіщення)
+    async function sendToTelegram(wh, code) {
+        const chatId = tg.initDataUnsafe?.user?.id;
+        if (!chatId) return;
+
+        const text = `📦 *Новий товар!*\n🏭 Склад: ${wh}\n🔢 Код: \`${code}\``;
+        
+        try {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'Markdown' })
+            });
+        } catch (e) { console.error("Telegram Error"); }
+    }
+
+    function updateStatus(msg, type) {
+        const s = document.getElementById('status');
+        s.innerText = msg;
+        s.className = "status-box " + type;
     }
 </script>
 </body>
