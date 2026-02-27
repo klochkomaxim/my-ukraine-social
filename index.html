@@ -3,90 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Склад-Сканер Pro</title>
+    <title>Warehouse Scan Pro + Flash</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        :root { --primary: #22c55e; --bg: #0f172a; --card: #1e293b; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; overflow-x: hidden; }
+        :root { --primary: #22c55e; --bg: #0f172a; --card: #1e293b; --accent: #f59e0b; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
         .card { background: var(--card); padding: 15px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 15px; }
         input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; outline: none; }
-        input:focus { border-color: var(--primary); }
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #334155; }
-        .status-box { margin-top: 15px; padding: 12px; border-radius: 10px; font-size: 14px; text-align: center; font-weight: bold; transition: 0.3s; }
-        .success { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
-        .error { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+        .controls { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-flash { flex: 1; background: var(--accent); color: #000; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .status-box { margin-top: 15px; padding: 12px; border-radius: 10px; font-size: 14px; text-align: center; font-weight: bold; }
         .info { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+        .success { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h3 style="margin: 0 0 15px 0; text-align: center;">📦 Складський Облік</h3>
-        <input type="text" id="whName" placeholder="Введіть назву складу..." value="Головний Склад">
+        <h3 style="margin: 0 0 15px 0; text-align: center;">📦 Склад Pro + 🔦</h3>
+        <input type="text" id="whName" placeholder="Назва складу..." value="Головний Склад">
         
         <div id="reader"></div>
-        
-        <div id="status" class="status-box info">Наведіть камеру на код</div>
-    </div>
 
-    <div id="logs" style="padding-bottom: 50px;"></div>
+        <div class="controls">
+            <button id="flashBtn" class="btn-flash" onclick="toggleFlash()">
+                🔦 ЛІХТАРИК
+            </button>
+        </div>
+        
+        <div id="status" class="status-box info">Наведіть на код (автофокус увімкнено)</div>
+    </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // КОНФІГУРАЦІЯ (Зміни токен!)
+    // КОНФІГУРАЦІЯ
     const BOT_TOKEN = "8434922111:AAGEEoBwKba5ZO0r7FnAusEc31XIV_oAjtw"; 
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
     let lastResult = "";
     let lastTime = 0;
+    let isFlashOn = false;
+    let videoTrack = null;
 
-    // 1. НАЛАШТУВАННЯ СКАНЕРА ТА АВТОФОКУСУ
     const html5QrCode = new Html5Qrcode("reader");
+
     const config = { 
         fps: 20, 
-        qrbox: { width: 280, height: 180 },
-        aspectRatio: 1.0,
+        qrbox: { width: 260, height: 160 },
         videoConstraints: {
-            facingMode: "environment",
-            focusMode: "continuous", // Автофокус
-            whiteBalanceMode: "continuous"
+            facingMode: { exact: "environment" },
+            focusMode: "continuous",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
         }
     };
 
-    // 2. ЗАПУСК
+    // ЗАПУСК СКАНЕРА
     html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-        .catch(err => updateStatus("Помилка камери: " + err, "error"));
+        .then(() => {
+            // Отримуємо доступ до відеотреку для керування фокусом та спалахом
+            videoTrack = html5QrCode.getRunningTrack();
+            applyAdvancedSettings();
+        })
+        .catch(err => console.error("Camera error:", err));
 
-    // 3. ОБРОБКА СКАНУВАННЯ
+    function applyAdvancedSettings() {
+        if (!videoTrack) return;
+        const capabilities = videoTrack.getCapabilities();
+        
+        // Примусовий автофокус, якщо підтримується
+        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+            videoTrack.applyConstraints({
+                advanced: [{ focusMode: 'continuous' }]
+            }).catch(e => console.log("Focus constraint error", e));
+        }
+    }
+
+    // КЕРУВАННЯ ЛІХТАРИКОМ
+    async function toggleFlash() {
+        if (!videoTrack) return;
+        const capabilities = videoTrack.getCapabilities();
+
+        if (capabilities.torch) {
+            isFlashOn = !isFlashOn;
+            try {
+                await videoTrack.applyConstraints({
+                    advanced: [{ torch: isFlashOn }]
+                });
+                document.getElementById('flashBtn').style.background = isFlashOn ? "#fff" : "#f59e0b";
+            } catch (e) {
+                alert("Ліхтарик не підтримується на цьому пристрої");
+            }
+        } else {
+            alert("Камера не підтримує керування ліхтариком через браузер");
+        }
+    }
+
     async function onScanSuccess(decodedText) {
         const now = Date.now();
-        // Захист від повторів (3 секунди)
         if (decodedText === lastResult && (now - lastTime) < 3000) return;
 
         lastResult = decodedText;
         lastTime = now;
 
         const warehouse = document.getElementById('whName').value || "Не вказано";
-        updateStatus("Відправка: " + decodedText, "info");
-
-        // Вібрація
         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
-        // Відправляємо всюди паралельно
+        updateStatus("Надсилаю: " + decodedText, "success");
+
         await Promise.all([
             sendToSupabase(warehouse, decodedText),
             sendToTelegram(warehouse, decodedText)
         ]);
     }
 
-    // 4. ВІДПРАВКА В SUPABASE (для Excel)
     async function sendToSupabase(wh, code) {
         try {
-            const res = await fetch(SB_URL, {
+            await fetch(SB_URL, {
                 method: 'POST',
                 headers: { 
                     'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 
@@ -98,25 +136,20 @@
                     username: tg.initDataUnsafe?.user?.first_name || "Максим"
                 })
             });
-            if (res.ok) updateStatus("✅ Записано в базу та Бот", "success");
-            else updateStatus("❌ Помилка бази (CORS?)", "error");
-        } catch (e) { updateStatus("❌ Помилка мережі", "error"); }
+        } catch (e) { console.error("DB Error", e); }
     }
 
-    // 5. ПРЯМА ВІДПРАВКА В БОТ (сповіщення)
     async function sendToTelegram(wh, code) {
         const chatId = tg.initDataUnsafe?.user?.id;
         if (!chatId) return;
-
-        const text = `📦 *Новий товар!*\n🏭 Склад: ${wh}\n🔢 Код: \`${code}\``;
-        
+        const text = `📦 *Scan:* \`${code}\`\n🏭 *Warehouse:* ${wh}`;
         try {
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'Markdown' })
             });
-        } catch (e) { console.error("Telegram Error"); }
+        } catch (e) { console.error("TG Error", e); }
     }
 
     function updateStatus(msg, type) {
