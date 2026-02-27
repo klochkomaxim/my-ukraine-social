@@ -9,116 +9,122 @@
     <style>
         :root { --primary: #22c55e; --bg: #000; --card: #111; }
         body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding: 10px; }
-        .card { background: var(--card); padding: 15px; border-radius: 16px; border: 1px solid #333; }
-        input { width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: white; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; }
-        #reader { width: 100%; border-radius: 12px; overflow: hidden; border: 2px solid #22c55e; background: #000; }
-        .btn-flash { width: 100%; background: #f59e0b; color: black; border: none; padding: 15px; border-radius: 10px; font-weight: bold; margin-top: 10px; cursor: pointer; }
-        .status { margin-top: 15px; padding: 10px; border-radius: 10px; text-align: center; font-weight: bold; background: #1a1a1a; border: 1px solid #333; }
+        .header { background: var(--card); padding: 15px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; text-align: center; }
+        #reader { width: 100%; border-radius: 15px; overflow: hidden; border: 2px solid #22c55e; }
+        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--primary); color: #000; padding: 12px 20px; border-radius: 30px; font-weight: bold; z-index: 1000; display: none; }
+        .product-card { margin-top: 10px; background: #1a1a1a; padding: 10px; border-radius: 10px; border-left: 4px solid #22c55e; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <input type="text" id="whName" placeholder="Назва складу..." value="Головний Склад">
-        <div id="reader"></div>
-        <button class="btn-flash" onclick="toggleFlash()">🔦 УВІМКНУТИ ЛІХТАРИК</button>
-        <div id="status" class="status">Шукаю коди (QR, Barcode, EAN)...</div>
-    </div>
+<div id="successToast" class="toast">✅ ПРОСКАНОВАНО УСПІШНО!</div>
+
+<div class="header">
+    <small style="color: #888;">Склад:</small>
+    <div id="displayWh" style="font-weight: bold; font-size: 18px;">Завантаження...</div>
+</div>
+
+<div id="reader"></div>
+
+<div id="productInfo" class="product-card">
+    🔍 Наведіть камеру на товар для пошуку...
+</div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
+    let warehouseName = prompt("Введіть назву складу:", "Основний") || "Склад 1";
+    document.getElementById('displayWh').innerText = warehouseName;
+
     const BOT_TOKEN = "8434922111:AAGEEoBwKba5ZO0r7FnAusEc31XIV_oAjtw"; 
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
 
-    let lastResult = "";
-    let lastTime = 0;
-    let videoTrack = null;
-    let isFlash = false;
 
-    // Включаємо підтримку ВСІХ форматів
-    const formatsToSupport = [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.DATA_MATRIX,
-        Html5QrcodeSupportedFormats.ITF
-    ];
-
-    const html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
-
+    const html5QrCode = new Html5Qrcode("reader");
     const config = { 
-        fps: 30, // Збільшуємо частоту кадрів для плавності
-        qrbox: (viewfinderWidth, viewfinderHeight) => {
-            return { width: viewfinderWidth * 0.8, height: viewfinderHeight * 0.4 }; // Широка зона для штрих-кодів
-        },
-        videoConstraints: {
-            facingMode: { exact: "environment" },
-            width: { ideal: 1920 }, // Full HD для чіткості дрібних ліній
-            height: { ideal: 1080 },
-            focusMode: "continuous"
-        }
+        fps: 25, 
+        qrbox: (w, h) => { return { width: w * 0.9, height: h * 0.4 }; },
+        videoConstraints: { facingMode: "environment", focusMode: "continuous" }
     };
 
-    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-        .then(() => {
-            videoTrack = html5QrCode.getRunningTrack();
-            // ПРИМУСОВИЙ АВТОФОКУС через 2 секунди
-            setTimeout(() => {
-                if (videoTrack) {
-                    const capabilities = videoTrack.getCapabilities();
-                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                        videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-                    }
-                }
-            }, 2000);
-        });
+    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
 
-    async function toggleFlash() {
-        if (!videoTrack) return;
-        isFlash = !isFlash;
+    // ФУНКЦІЯ ПОШУКУ В ІНТЕРНЕТІ ТА БАЗІ
+    async function getProductName(barcode) {
+        // 1. Спочатку перевіряємо свою локальну базу в Supabase
         try {
-            await videoTrack.applyConstraints({ advanced: [{ torch: isFlash }] });
-        } catch (e) { alert("Ліхтарик не підтримується"); }
+            const localRes = await fetch(`${SB_URL}/product_catalog?barcode=eq.${barcode}`, {
+                headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+            });
+            const localData = await localRes.json();
+            if (localData.length > 0) return localData[0].name;
+
+            // 2. Якщо в нас немає - йдемо в Global API (Open Food Facts)
+            const globalRes = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+            const globalData = await globalRes.json();
+            
+            if (globalData.status === 1) {
+                const name = globalData.product.product_name || globalData.product.generic_name || "Товар знайдено";
+                // Зберігаємо в свій каталог, щоб наступного разу було миттєво
+                saveToCatalog(barcode, name);
+                return name;
+            }
+        } catch (e) { console.error("Search error", e); }
+        
+        return "Невідомий товар";
     }
 
     async function onScanSuccess(decodedText) {
         const now = Date.now();
-        if (decodedText === lastResult && (now - lastTime) < 2500) return;
-
-        lastResult = decodedText;
+        if (now - lastTime < 3000) return;
         lastTime = now;
 
-        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        document.getElementById('status').innerText = "✅ Зчитано: " + decodedText;
-        document.getElementById('status').style.borderColor = "#22c55e";
+        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
 
-        const wh = document.getElementById('whName').value || "Склад";
+        document.getElementById('productInfo').innerText = "⏳ Шукаю в мережі...";
+        const productName = await getProductName(decodedText);
         
-        // Відправка
-        fetch(SB_URL, {
+        document.getElementById('productInfo').innerHTML = `<b>📦 ${productName}</b><br><small>Код: ${decodedText}</small>`;
+        showToast();
+
+        // Записуємо скан
+        sendToSupabase(productName, decodedText);
+        sendToTelegram(productName, decodedText);
+    }
+
+    function saveToCatalog(barcode, name) {
+        fetch(`${SB_URL}/product_catalog`, {
             method: 'POST',
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ warehouse_name: wh, code_data: decodedText, username: tg.initDataUnsafe?.user?.first_name || "User" })
-        });
+            body: JSON.stringify({ barcode: barcode, name: name })
+        }).catch(() => {});
+    }
 
+    async function sendToSupabase(name, code) {
+        fetch(`${SB_URL}/scans`, {
+            method: 'POST',
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ warehouse_name: warehouseName, code_data: code, product_name: name, username: tg.initDataUnsafe?.user?.first_name })
+        });
+    }
+
+    async function sendToTelegram(name, code) {
+        const text = `✅ *Сканування успішне!*\n🏭 Склад: ${warehouseName}\n📦 Товар: *${name}*\n🔢 Код: \`${code}\``;
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: tg.initDataUnsafe?.user?.id, text: `📦 *${wh}:* \`${decodedText}\``, parse_mode: 'Markdown' })
+            body: JSON.stringify({ chat_id: tg.initDataUnsafe?.user?.id, text: text, parse_mode: 'Markdown' })
         });
-
-        setTimeout(() => {
-            document.getElementById('status').innerText = "Готовий до наступного коду...";
-            document.getElementById('status').style.borderColor = "#333";
-        }, 2000);
     }
+
+    function showToast() {
+        const t = document.getElementById('successToast');
+        t.style.display = 'block';
+        setTimeout(() => t.style.display = 'none', 2000);
+    }
+    let lastTime = 0;
 </script>
 </body>
 </html>
