@@ -3,116 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UA Social</title>
+    <title>Warehouse Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; background: #000; color: #fff; margin: 0; padding: 15px; overflow-x: hidden; }
-        .card { background: #111; padding: 15px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; }
-        textarea { width: 100%; height: 80px; background: #1a1a1a; color: #fff; border: 1px solid #444; padding: 10px; border-radius: 8px; font-size: 16px; box-sizing: border-box; outline: none; resize: none; }
-        .btn { background: #0088cc; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; margin-top: 10px; font-size: 16px; cursor: pointer; }
-        .btn:disabled { opacity: 0.5; }
-        #feed { margin-top: 20px; padding-bottom: 100px; }
-        .post { background: #111; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid #0088cc; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        #player { position: fixed; bottom: 0; left: 0; width: 100%; background: #0a0a0a; padding: 15px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 1000; }
-        #play-btn { background: #e53935; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; }
+        :root { --main: #0088cc; --bg: #0f172a; --card: #1e293b; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding: 15px; }
+        .header { text-align: center; padding: 10px 0; border-bottom: 1px solid #334155; margin-bottom: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; }
+        .btn { background: var(--main); color: white; border: none; padding: 14px; width: 100%; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-top: 10px; display: none; }
+        .log-item { background: #334155; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 14px; border-left: 4px solid var(--main); }
+        .status { color: #94a3b8; font-size: 12px; margin-top: 5px; text-align: center; }
     </style>
 </head>
 <body>
-    <h3>UA Social 🇺🇦</h3>
-    <div class="card">
-        <textarea id="msg" placeholder="Напиши щось цікаве..."></textarea>
-        <button onclick="sendPost()" id="btn" class="btn">Опублікувати 🚀</button>
+    <div class="header">
+        <h2 style="margin:0;">Warehouse Scan Pro 📦</h2>
     </div>
-    <div id="feed">Завантаження стрічки...</div>
 
-    <div id="player">
-        <span>Radio Rocks UA 🎸</span>
-        <button id="play-btn" onclick="toggle()">ГРАТИ</button>
+    <div class="card">
+        <label>Назва складу:</label>
+        <input type="text" id="whName" placeholder="Наприклад: Склад №1" value="Головний склад">
+        
+        <button id="scanBtn" class="btn" onclick="startScanner()">
+            📷 Запустити Сканер
+        </button>
+        <div id="reader"></div>
+        <p class="status" id="status">Готовий до роботи</p>
     </div>
+
+    <div id="logs"></div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // ВАЖЛИВО: Перевір, щоб в кінці URL НЕ БУЛО зайвих слешів
-    const BASE_URL = "https://qappwloefuraalqfcekl.supabase.co";
-    const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
+    const URL = "https://qappwloefuraalqfcekl.supabase.co/rest/v1/scans";
+    const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxMjEzOTYsImV4cCI6MjA1NTcwMTM5Nn0.2E7Lp8m6t0s3p6Z2X7Lp8m6t0s3p6Z2X7Lp8m6t0s3p";
 
-    let audio = new Audio("https://online.radioroks.ua/RadioROKS");
-    function toggle() {
-        const b = document.getElementById('play-btn');
-        if (audio.paused) { audio.play().catch(e => alert("Натисніть ще раз")); b.innerText = "ПАУЗА"; }
-        else { audio.pause(); b.innerText = "ГРАТИ"; }
+    let html5QrCode;
+
+    function startScanner() {
+        document.getElementById('reader').style.display = 'block';
+        html5QrCode = new Html5Qrcode("reader");
+        
+        const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+        document.getElementById('scanBtn').style.display = 'none';
     }
 
-    async function sendPost() {
-        const msg = document.getElementById('msg');
-        const btn = document.getElementById('btn');
-        const text = msg.value.trim();
-        if (!text) return;
-
-        btn.disabled = true;
-        btn.innerText = "Надсилаю...";
+    async function onScanSuccess(decodedText, decodedResult) {
+        const wh = document.getElementById('whName').value;
+        document.getElementById('status').innerText = "Надсилаю: " + decodedText;
+        
+        // Вібрація при успіху
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
         try {
-            const response = await fetch(BASE_URL, {
+            const res = await fetch(URL, {
                 method: 'POST',
-                headers: {
-                    'apikey': KEY,
-                    'Authorization': `Bearer ${KEY}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=representation' // Змінено для кращої відповіді від бази
+                headers: { 
+                    'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 
+                    'Content-Type': 'application/json', 'Prefer': 'return=minimal' 
                 },
-                body: JSON.stringify({ 
-                    username: "Максим", 
-                    content: text 
+                body: JSON.stringify({
+                    warehouse_name: wh,
+                    code_data: decodedText,
+                    code_type: decodedResult.result.format.formatName,
+                    username: tg.initDataUnsafe?.user?.first_name || "Максим"
                 })
             });
 
-            if (response.ok) {
-                msg.value = "";
-                setTimeout(loadPosts, 500); // Невелика затримка перед оновленням
-            } else {
-                const errorData = await response.json();
-                alert("Помилка: " + (errorData.message || "Невідома помилка"));
+            if (res.ok) {
+                addLog(wh, decodedText);
             }
-        } catch (e) {
-            alert("Помилка з'єднання з базою. Перевір інтернет.");
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "Опублікувати 🚀";
-        }
+        } catch (e) { alert("Помилка відправки"); }
     }
 
-    async function loadPosts() {
-        try {
-            const response = await fetch(`${BASE_URL}?select=*&order=created_at.desc`, {
-                headers: {
-                    'apikey': KEY,
-                    'Authorization': `Bearer ${KEY}`
-                }
-            });
-            const data = await response.json();
-            const feed = document.getElementById('feed');
-            
-            if (data.length === 0) {
-                feed.innerText = "Стрічка порожня. Будь першим!";
-            } else {
-                feed.innerHTML = data.map(p => `
-                    <div class="post">
-                        <b style="color: #0088cc;">@${p.username}</b>
-                        <p style="margin: 8px 0 0; line-height: 1.4;">${p.content}</p>
-                    </div>
-                `).join('');
-            }
-        } catch (e) {
-            document.getElementById('feed').innerText = "Не вдалося завантажити стрічку.";
-        }
+    function addLog(wh, code) {
+        const log = document.getElementById('logs');
+        const item = document.createElement('div');
+        item.className = 'log-item';
+        item.innerHTML = `<b>${wh}</b>: ${code}<br><small>${new Date().toLocaleTimeString()}</small>`;
+        log.prepend(item);
     }
-
-    // Завантажити при старті
-    loadPosts();
 </script>
 </body>
 </html>
