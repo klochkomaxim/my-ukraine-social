@@ -3,38 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UA СКЛАД FINAL</title>
+    <title>UA СКЛАД FINAL PRO</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: -apple-system, sans-serif; background: #000; color: white; margin: 0; overflow: hidden; }
-        #reader { width: 100% !important; height: 60vh !important; }
+        #reader { width: 100% !important; height: 60vh !important; background: #000; }
         #log-area { background: #111; color: #0f0; font-size: 11px; height: 30vh; overflow-y: auto; padding: 10px; font-family: monospace; border-top: 2px solid #0057b7; text-align: left; }
-        .ov { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+        .ov { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+        .header { background: #0057b7; padding: 10px; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
 
 <div id="ov" class="ov">
     <h1 id="ov-i">🔎</h1>
-    <h2 id="ov-t">ОБРОБКА</h2>
-    <p id="ov-d"></p>
+    <h2 id="ov-t">ПОШУК...</h2>
+    <p id="ov-d" style="font-size: 18px; color: #ffd700;"></p>
 </div>
 
-<div style="background: #0057b7; padding: 10px; font-weight: bold;">UA СКЛАД 🇺🇦</div>
-
+<div class="header">UA СКЛАД 🇺🇦 (v8.0)</div>
 <div id="reader"></div>
-
-<div id="log-area">
-    <div>> Система ініціалізована...</div>
-</div>
+<div id="log-area"><div>> Система запущена через Проксі...</div></div>
 
 <script>
     const tg = window.Telegram.WebApp;
     const BOT_TOKEN = "8434922111:AAGEEoBwKba5ZO0r7FnAusEc31XIV_oAjtw"; 
     const SB_URL = "https://qappwloefuraalqfcekl.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhcHB3bG9lZnVyYWFscWZjZWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2OTIzOTcsImV4cCI6MjA4NzI2ODM5N30.vRZSxRXqoOXG-TI5qeBvm2L9Hvi8NeLeOXpFlzrgEQI";
-
 
     function writeLog(m, c = "#0f0") {
         const l = document.getElementById('log-area');
@@ -45,63 +41,67 @@
     scanner.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, onScan);
 
     async function onScan(code) {
-        writeLog("Скан: " + code, "#fff");
+        writeLog("Код: " + code, "#fff");
         scanner.pause();
-        showOv("⏳", "ПЕРЕВІРКА", code);
+        showOv("⏳", "ШУКАЮ В ІНТЕРНЕТІ", code);
 
         let name = "";
 
-        // 1. ЧИТАННЯ
+        // 1. СПРОБА ПОШУКУ В SUPABASE ЧЕРЕЗ ПРОКСІ
         try {
-            const r = await fetch(`${SB_URL}/product_catalog?barcode=eq.${code}`, {
-                method: "GET",
+            const target = `${SB_URL}/product_catalog?barcode=eq.${code}`;
+            const proxy = "https://corsproxy.io/?" + encodeURIComponent(target);
+            const r = await fetch(proxy, {
                 headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
             });
             const d = await r.json();
-            if (d && d.length > 0) {
-                name = d[0].name;
-                writeLog("Знайдено в базі: " + name);
-            }
-        } catch(e) { writeLog("Помилка читання: " + e.message, "red"); }
+            if (d && d.length > 0) name = d[0].name;
+        } catch(e) { writeLog("Supabase недоступний..."); }
 
-        // 2. ВВЕДЕННЯ
+        // 2. ЯКЩО НЕМАЄ В БАЗІ — ШУКАЄМО В ІНТЕРНЕТІ (Open Food Facts)
         if (!name) {
-            name = prompt("Товар не знайдено. Введіть назву:");
-            if (name) {
-                try {
-                    await fetch(`${SB_URL}/product_catalog`, {
-                        method: "POST",
-                        headers: { 
-                            "apikey": SB_KEY, 
-                            "Authorization": "Bearer " + SB_KEY,
-                            "Content-Type": "application/json",
-                            "Prefer": "resolution=merge-duplicates"
-                        },
-                        body: JSON.stringify({ barcode: code, name: name })
-                    });
-                    writeLog("Базу оновлено!", "yellow");
-                } catch(e) { writeLog("Помилка запису: " + e.message, "red"); }
-            }
+            try {
+                const offTarget = `https://world.openfoodfacts.org/api/v0/product/${code}.json`;
+                const offProxy = "https://corsproxy.io/?" + encodeURIComponent(offTarget);
+                const offRes = await fetch(offProxy);
+                const offData = await offRes.json();
+                if (offData.status === 1) {
+                    name = offData.product.product_name || offData.product.generic_name;
+                    writeLog("Знайдено в мережі: " + name, "yellow");
+                }
+            } catch(e) { writeLog("Інтернет-пошук не вдався"); }
         }
 
-        // 3. ЗВІТ У ТЕЛЕГРАМ ТА СКАН-ЛОГ
+        // 3. РУЧНЕ ВВЕДЕННЯ, ЯКЩО НІДЕ НЕМАЄ
+        if (!name) {
+            name = prompt("Назва не знайдена. Введіть вручну:");
+        }
+
         if (name) {
+            showOv("✅", "ЗБЕРЕЖЕННЯ", name);
+            await saveToDB(code, name);
             sendTG(code, name);
-            logScanToDB(code, name);
-            showOv("✅", "ГОТОВО", name);
         }
 
-        setTimeout(() => { hideOv(); scanner.resume(); }, 2000);
+        setTimeout(() => { hideOv(); scanner.resume(); }, 2500);
     }
 
-    async function logScanToDB(c, n) {
+    async function saveToDB(c, n) {
         try {
-            await fetch(`${SB_URL}/scans`, {
+            const target = `${SB_URL}/product_catalog`;
+            const proxy = "https://corsproxy.io/?" + encodeURIComponent(target);
+            await fetch(proxy, {
                 method: "POST",
-                headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
-                body: JSON.stringify({ warehouse_name: "Головний", code_data: c, product_name: n, username: "Admin" })
+                headers: { 
+                    "apikey": SB_KEY, 
+                    "Authorization": "Bearer " + SB_KEY,
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates"
+                },
+                body: JSON.stringify({ barcode: c, name: n })
             });
-        } catch(e) {}
+            writeLog("Дані збережено успішно!");
+        } catch(e) { writeLog("Помилка збереження."); }
     }
 
     function sendTG(c, n) {
